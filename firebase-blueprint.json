@@ -1,0 +1,42 @@
+{
+  "$schema": "https://raw.githubusercontent.com/firebase/firebase-blueprint-schema/main/schema.json",
+  "entities": {
+    "suppliers": {
+      "description": "Yetkazib beruvchilar ma'lumotlari ro'yxati",
+      "fields": {
+        "orderNumber": { "type": "number", "required": true },
+        "systemTime": { "type": "string", "required": true },
+        "createdAt": { "type": "number", "required": true },
+        "activityType": { "type": "string", "required": true },
+        "name": { "type": "string", "required": true },
+        "address": { "type": "string", "required": true },
+        "phone": { "type": "string", "required": true },
+        "paymentMethod": { "type": "string", "required": true },
+        "paymentCondition": { "type": "string", "required": true },
+        "delayDays": { "type": "string", "required": false },
+        "qualityStability": { "type": "string", "required": true },
+        "transparencyLevel": { "type": "string", "required": true },
+        "responsibility": { "type": "string", "required": true },
+        "disciplineLevel": { "type": "string", "required": true },
+        "extras": { "type": "string", "required": true },
+        "products": { "type": "array", "required": false }
+      }
+    },
+    "auto_parts": {
+      "description": "Avto ehtiyot qismlar ro'yxati",
+      "fields": {
+        "orderNumber": { "type": "number", "required": true },
+        "systemTime": { "type": "string", "required": true },
+        "createdAt": { "type": "number", "required": true },
+        "partName": { "type": "string", "required": true },
+        "brand": { "type": "string", "required": true },
+        "supplierName": { "type": "string", "required": true },
+        "price": { "type": "number", "required": true },
+        "priceFormatted": { "type": "string", "required": false },
+        "date": { "type": "string", "required": true },
+        "source": { "type": "string", "required": true },
+        "comment": { "type": "string", "required": true }
+      }
+    }
+  }
+}

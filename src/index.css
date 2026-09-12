@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+:root {
+  font-family: 'Outfit', sans-serif;
+}
+
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+body {
+  font-family: 'Outfit', sans-serif;
+  color: #000000;
+  background-color: #fffbeb;
+}
+
+h1, h2, h3, h4, .font-heading {
+  font-family: 'Syne', 'Outfit', sans-serif;
+}
+
+/* Ensure sharp rectangular styling requested by user */
+* {
+  border-radius: 0px !important;
+}

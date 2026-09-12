@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="daewoo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f2b5c" />
+      <stop offset="50%" stop-color="#1e4287" />
+      <stop offset="100%" stop-color="#0a1d42" />
+    </linearGradient>
+    <linearGradient id="silver-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="50%" stop-color="#e2e8f0" />
+      <stop offset="100%" stop-color="#94a3b8" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="108" fill="url(#daewoo-grad)" />
+  <circle cx="256" cy="256" r="216" stroke="rgba(255,255,255,0.15)" stroke-width="4" fill="none" />
+  
+  <!-- Stylized Daewoo Geometric Emblem -->
+  <g transform="translate(256,220)">
+    <!-- Central Crown / Wing arcs -->
+    <path d="M-110,60 C-110,-40 0,-110 0,-110 C0,-110 110,-40 110,60 C80,35 40,20 0,20 C-40,20 -80,35 -110,60 Z" fill="url(#silver-grad)" />
+    <path d="M-85,68 C-55,50 -25,42 0,42 C25,42 55,50 85,68 C55,85 25,92 0,92 C-25,92 -55,85 -85,68 Z" fill="#ffffff" opacity="0.95" />
+    <!-- Wing cuts -->
+    <path d="M-140,40 C-125,-10 -60,-65 0,-85 C-45,-55 -95,-10 -115,35 Z" fill="#93c5fd" opacity="0.8" />
+    <path d="M140,40 C125,-10 60,-65 0,-85 C45,-55 95,-10 115,35 Z" fill="#93c5fd" opacity="0.8" />
+  </g>
+
+  <!-- Typography -->
+  <text x="256" y="380" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="52" font-weight="900" letter-spacing="14" fill="#ffffff" text-anchor="middle">DAEWOO</text>
+  <text x="256" y="415" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="18" font-weight="600" letter-spacing="4" fill="#93c5fd" text-anchor="middle">SUPPLIER SYSTEM</text>
+</svg>

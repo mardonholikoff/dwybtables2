@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Suppliers collection: readable and writable for users of the applet
+    match /suppliers/{supplierId} {
+      allow read, write: if true;
+    }
+    
+    // Auto parts collection: readable and writable for users of the applet
+    match /auto_parts/{partId} {
+      allow read, write: if true;
+    }
+  }
+}
