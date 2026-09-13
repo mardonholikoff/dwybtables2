@@ -84,22 +84,30 @@ export interface AutoPart {
   systemTime: string; // 2-sistema vaqti (avtomatik)
   createdAt: number;
   partName: string; // 3-avto ehtiyot qism nomi (majburiy)
-  brand: string; // 4-brend (majburiy)
-  supplierName: string; // 5-yetkazib beruvchi (majburiy)
-  price: number; // 6-narx (majburiy)
-  date: string; // 7-sana (majburiy)
-  source: string; // 8-ma'lumot manbaasi (majburiy)
-  comment: string; // 9-izoh (majburiy)
+  code?: string; // Kod (ixtiyoriy)
+  specialMark?: string; // Maxsus belgisi (ixtiyoriy)
+  carPosition?: string; // Mashinada joylashgan joyi (ixtiyoriy)
+  country: string; // Ishlab chiqarilgan davlati (majburiy)
+  comment?: string; // Nomsiz izoh (ixtiyoriy)
+  brand: string; // Brend (majburiy)
+  supplierName: string; // Yetkazib beruvchi (majburiy)
+  price: number; // Narx (majburiy)
+  date: string; // Sana (majburiy)
+  source: string; // Ma'lumot manbaasi (majburiy)
 }
 
 export interface AutoPartFormData {
   partName: string;
+  code: string;
+  specialMark: string;
+  carPosition: string;
+  country: string;
+  comment: string;
   brand: string;
   supplierName: string;
   price: string;
   date: string;
   source: string;
-  comment: string;
 }
 
 export type ActiveTab = 'suppliers' | 'autoparts' | 'analytics';

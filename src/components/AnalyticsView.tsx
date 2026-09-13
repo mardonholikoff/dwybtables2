@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import {
   TrendingUp,
   Calendar,
-  Droplet,
   Wrench,
   Tag,
   Building2,
@@ -19,11 +18,14 @@ import {
   EyeOff,
   Phone,
   MapPin,
-  ShieldCheck,
   Award,
-  Zap,
   History,
-  AlertCircle,
+  Filter,
+  RotateCcw,
+  X,
+  Globe,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -38,6 +40,7 @@ import {
 import { AutoPart, Supplier } from '../types';
 import * as XLSX from 'xlsx';
 import { formatUSD } from '../utils/formatCurrency';
+import { MultiSelectPickFilter } from './MultiSelectPickFilter';
 
 interface AnalyticsViewProps {
   parts: AutoPart[];
@@ -59,15 +62,26 @@ const SUPPLIER_COLORS = [
 ];
 
 export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers = [] }) => {
-  // 1-BOSQICH: Sana oralig'i (Boshlanish va tugash sanasi)
+  // 1. Sana oralig'i
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
-  // 2-BOSQICH: Ehtiyot qism turi/nomi (Bazadagi mavjud turlar)
-  const [selectedPartName, setSelectedPartName] = useState<string>('');
+  // 2. Ko'p tanlovli (multi-select) filtr holatlari:
+  // - Ehtiyot qism turlari
+  // - Brendlar
+  // - Kodlar
+  // - Maxsus belgilar
+  // - Mashinadagi joylar
+  // - Ishlab chiqarilgan davlatlar
+  const [filterPartNames, setFilterPartNames] = useState<string[]>([]);
+  const [filterBrands, setFilterBrands] = useState<string[]>([]);
+  const [filterCodes, setFilterCodes] = useState<string[]>([]);
+  const [filterSpecialMarks, setFilterSpecialMarks] = useState<string[]>([]);
+  const [filterCarPositions, setFilterCarPositions] = useState<string[]>([]);
+  const [filterCountries, setFilterCountries] = useState<string[]>([]);
 
-  // 3-BOSQICH: Brend tanlash (Tanlangan qismga mos brendlar)
-  const [selectedBrand, setSelectedBrand] = useState<string>('ALL');
+  // Filtrlar paneli ochilgan/yopilganligi
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(true);
 
   // Grafik sozlamalari: "natural" (egrisimon oval) default qilib qo'yildi
   const [curveType, setCurveType] = useState<'natural' | 'monotone' | 'linear'>('natural');
@@ -85,41 +99,87 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
     return map;
   }, [suppliers]);
 
-  // 1. Bazadagi barcha unikal ehtiyot qism nomlari (Har bir nom ro'yxatda faqat bir marta chiqadi)
-  const uniquePartNames = useMemo(() => {
-    const map = new Map<string, number>();
+  // =========================================================================
+  // MAVJUD CELLAR ICHIDAGI MA'LUMOTLAR BO'YICHA UNIKAL RO'YXATLAR VA HISOB-KITOBLAR
+  // =========================================================================
+
+  // 1. Unikal qism nomlari va ularning soni
+  const { uniquePartNames, partNameCounts } = useMemo(() => {
+    const counts: Record<string, number> = {};
     parts.forEach((p) => {
-      const name = p.partName?.trim();
-      if (name) {
-        map.set(name, (map.get(name) || 0) + 1);
-      }
+      const val = p.partName?.trim();
+      if (val) counts[val] = (counts[val] || 0) + 1;
     });
-    return Array.from(map.entries())
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
+    return {
+      uniquePartNames: Object.keys(counts).sort((a, b) => a.localeCompare(b, 'uz')),
+      partNameCounts: counts,
+    };
   }, [parts]);
 
-  // Agar ehtiyot qism hali tanlanmagan bo'lsa, birinchisini avtomatik tanlaymiz
-  const activePartName = useMemo(() => {
-    if (selectedPartName && uniquePartNames.some((p) => p.name === selectedPartName)) {
-      return selectedPartName;
-    }
-    return uniquePartNames.length > 0 ? uniquePartNames[0].name : '';
-  }, [selectedPartName, uniquePartNames]);
-
-  // 2. Tanlangan ehtiyot qismga tegishli mavjud brendlar ro'yxati
-  const availableBrands = useMemo(() => {
-    if (!activePartName) return [];
-    const brandSet = new Set<string>();
+  // 2. Unikal brendlar va ularning soni
+  const { uniqueBrands, brandCounts } = useMemo(() => {
+    const counts: Record<string, number> = {};
     parts.forEach((p) => {
-      if (p.partName?.trim().toLowerCase() === activePartName.trim().toLowerCase()) {
-        if (p.brand && p.brand.trim()) {
-          brandSet.add(p.brand.trim());
-        }
-      }
+      const val = p.brand?.trim();
+      if (val) counts[val] = (counts[val] || 0) + 1;
     });
-    return Array.from(brandSet).sort();
-  }, [parts, activePartName]);
+    return {
+      uniqueBrands: Object.keys(counts).sort((a, b) => a.localeCompare(b, 'uz')),
+      brandCounts: counts,
+    };
+  }, [parts]);
+
+  // 3. Unikal kodlar va ularning soni
+  const { uniqueCodes, codeCounts } = useMemo(() => {
+    const counts: Record<string, number> = {};
+    parts.forEach((p) => {
+      const val = p.code?.trim();
+      if (val) counts[val] = (counts[val] || 0) + 1;
+    });
+    return {
+      uniqueCodes: Object.keys(counts).sort((a, b) => a.localeCompare(b, 'uz')),
+      codeCounts: counts,
+    };
+  }, [parts]);
+
+  // 4. Unikal maxsus belgilar va ularning soni
+  const { uniqueSpecialMarks, specialMarkCounts } = useMemo(() => {
+    const counts: Record<string, number> = {};
+    parts.forEach((p) => {
+      const val = p.specialMark?.trim();
+      if (val) counts[val] = (counts[val] || 0) + 1;
+    });
+    return {
+      uniqueSpecialMarks: Object.keys(counts).sort((a, b) => a.localeCompare(b, 'uz')),
+      specialMarkCounts: counts,
+    };
+  }, [parts]);
+
+  // 5. Unikal mashinadagi joylar va ularning soni
+  const { uniqueCarPositions, carPositionCounts } = useMemo(() => {
+    const counts: Record<string, number> = {};
+    parts.forEach((p) => {
+      const val = p.carPosition?.trim();
+      if (val) counts[val] = (counts[val] || 0) + 1;
+    });
+    return {
+      uniqueCarPositions: Object.keys(counts).sort((a, b) => a.localeCompare(b, 'uz')),
+      carPositionCounts: counts,
+    };
+  }, [parts]);
+
+  // 6. Unikal davlatlar va ularning soni
+  const { uniqueCountries, countryCounts } = useMemo(() => {
+    const counts: Record<string, number> = {};
+    parts.forEach((p) => {
+      const val = p.country?.trim();
+      if (val) counts[val] = (counts[val] || 0) + 1;
+    });
+    return {
+      uniqueCountries: Object.keys(counts).sort((a, b) => a.localeCompare(b, 'uz')),
+      countryCounts: counts,
+    };
+  }, [parts]);
 
   // Sana bo'yicha tezkor filtrlar
   const handleQuickDateFilter = (type: 'all' | '30d' | '3m' | '6m' | 'year') => {
@@ -147,31 +207,59 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
     setEndDate(endStr);
   };
 
-  // 3. Tanlangan muddat, ehtiyot qism va brend bo'yicha filtrlangan yozuvlar
+  // =========================================================================
+  // 7 TA MEZON ASOSIDA FILTRLASH LOGIKASI
+  // =========================================================================
   const filteredData = useMemo(() => {
-    if (!activePartName) return [];
-
     return parts.filter((item) => {
-      // Qism nomi mosligi
-      const partMatches =
-        item.partName?.trim().toLowerCase() === activePartName.trim().toLowerCase();
-      if (!partMatches) return false;
-
-      // Brend mosligi
-      if (selectedBrand !== 'ALL') {
-        if (item.brand?.trim().toLowerCase() !== selectedBrand.trim().toLowerCase()) {
-          return false;
-        }
+      // 1. Qism nomlari mosligi (ko'p tanlovli)
+      if (filterPartNames.length > 0 && !filterPartNames.includes(item.partName || '')) {
+        return false;
       }
 
-      // Sana oralig'i mosligi
+      // 2. Brend mosligi (ko'p tanlovli)
+      if (filterBrands.length > 0 && !filterBrands.includes(item.brand || '')) {
+        return false;
+      }
+
+      // 3. Kod mosligi (ko'p tanlovli)
+      if (filterCodes.length > 0 && !filterCodes.includes(item.code || '')) {
+        return false;
+      }
+
+      // 4. Maxsus belgisi mosligi (ko'p tanlovli)
+      if (filterSpecialMarks.length > 0 && !filterSpecialMarks.includes(item.specialMark || '')) {
+        return false;
+      }
+
+      // 5. Mashinadagi joyi mosligi (ko'p tanlovli)
+      if (filterCarPositions.length > 0 && !filterCarPositions.includes(item.carPosition || '')) {
+        return false;
+      }
+
+      // 6. Ishlab chiqarilgan davlati mosligi (ko'p tanlovli)
+      if (filterCountries.length > 0 && !filterCountries.includes(item.country || '')) {
+        return false;
+      }
+
+      // 7. Sana oralig'i mosligi
       const itemDate = item.date || '';
       if (startDate && itemDate < startDate) return false;
       if (endDate && itemDate > endDate) return false;
 
       return true;
     });
-  }, [parts, activePartName, selectedBrand, startDate, endDate]);
+  }, [
+    parts,
+    filterPartNames,
+    filterBrands,
+    filterCodes,
+    filterSpecialMarks,
+    filterCarPositions,
+    filterCountries,
+    startDate,
+    endDate,
+  ]);
 
   // Xronologik tartibda saralash (eng avvalgi sanadan oxirgisiga qarab)
   const sortedRecords = useMemo(() => {
@@ -182,6 +270,112 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
       return (a.createdAt || 0) - (b.createdAt || 0);
     });
   }, [filteredData]);
+
+  // Faol filtrlar ro'yxati (Badge / chip ko'rinishida ko'rsatish va tozalash)
+  const activeFilters = useMemo(() => {
+    const list: { id: string; label: string; value: string; clear: () => void }[] = [];
+
+    if (filterPartNames.length > 0) {
+      list.push({
+        id: 'partNames',
+        label: 'Qism nomi',
+        value: `${filterPartNames.length} ta (${filterPartNames.slice(0, 2).join(', ')}${
+          filterPartNames.length > 2 ? '...' : ''
+        })`,
+        clear: () => setFilterPartNames([]),
+      });
+    }
+
+    if (filterBrands.length > 0) {
+      list.push({
+        id: 'brands',
+        label: 'Brend',
+        value: `${filterBrands.length} ta (${filterBrands.slice(0, 2).join(', ')}${
+          filterBrands.length > 2 ? '...' : ''
+        })`,
+        clear: () => setFilterBrands([]),
+      });
+    }
+
+    if (filterCodes.length > 0) {
+      list.push({
+        id: 'codes',
+        label: 'Kod',
+        value: `${filterCodes.length} ta`,
+        clear: () => setFilterCodes([]),
+      });
+    }
+
+    if (filterSpecialMarks.length > 0) {
+      list.push({
+        id: 'specialMarks',
+        label: 'Maxsus belgisi',
+        value: `${filterSpecialMarks.length} ta`,
+        clear: () => setFilterSpecialMarks([]),
+      });
+    }
+
+    if (filterCarPositions.length > 0) {
+      list.push({
+        id: 'carPositions',
+        label: 'Mashinadagi joyi',
+        value: `${filterCarPositions.length} ta`,
+        clear: () => setFilterCarPositions([]),
+      });
+    }
+
+    if (filterCountries.length > 0) {
+      list.push({
+        id: 'countries',
+        label: 'Davlati',
+        value: `${filterCountries.length} ta (${filterCountries.slice(0, 2).join(', ')}${
+          filterCountries.length > 2 ? '...' : ''
+        })`,
+        clear: () => setFilterCountries([]),
+      });
+    }
+
+    if (startDate || endDate) {
+      list.push({
+        id: 'dateRange',
+        label: "Sana oralig'i",
+        value: `${startDate || '...'} → ${endDate || '...'}`,
+        clear: () => {
+          setStartDate('');
+          setEndDate('');
+        },
+      });
+    }
+
+    return list;
+  }, [
+    filterPartNames,
+    filterBrands,
+    filterCodes,
+    filterSpecialMarks,
+    filterCarPositions,
+    filterCountries,
+    startDate,
+    endDate,
+  ]);
+
+  const resetAllFilters = () => {
+    setFilterPartNames([]);
+    setFilterBrands([]);
+    setFilterCodes([]);
+    setFilterSpecialMarks([]);
+    setFilterCarPositions([]);
+    setFilterCountries([]);
+    setStartDate('');
+    setEndDate('');
+  };
+
+  // Tanlangan qism(lar) nomi matn ko'rinishida
+  const activePartDisplayName = useMemo(() => {
+    if (filterPartNames.length === 1) return filterPartNames[0];
+    if (filterPartNames.length > 1) return `${filterPartNames.length} ta ehtiyot qism`;
+    return 'Barcha avto ehtiyot qismlar';
+  }, [filterPartNames]);
 
   // Ushbu filtrda ishtirok etayotgan unikal yetkazib beruvchilar
   const involvedSuppliers = useMemo(() => {
@@ -238,7 +432,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
   // =========================================================================
   const currentSupplierQuotes = useMemo(() => {
     const map = new Map<string, AutoPart>();
-    // sortedRecords xronologik o'sish tartibida bo'lgani uchun oxirgi qiymat - eng yangisi bo'ladi
     sortedRecords.forEach((item) => {
       if (item.supplierName) {
         map.set(item.supplierName.trim(), item);
@@ -267,7 +460,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
   }, [currentSupplierQuotes]);
 
   // Tahliliy chizmalar uchun ma'lumotlarni tayyorlash:
-  // Har bir sana bitta X o'qi nuqtasi, har bir yetkazib beruvchi o'sha sanadagi narx chizmasiga ega bo'ladi
   const chartData = useMemo(() => {
     if (sortedRecords.length === 0) return [];
 
@@ -286,7 +478,12 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
       if (!entry._details) entry._details = {};
       entry._details[item.supplierName] = {
         price: item.price,
+        partName: item.partName,
         brand: item.brand,
+        code: item.code,
+        specialMark: item.specialMark,
+        carPosition: item.carPosition,
+        country: item.country,
         source: item.source,
         comment: item.comment,
         systemTime: item.systemTime,
@@ -389,10 +586,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
     });
   }, [sortedRecords, supplierColorMap]);
 
-  // =========================================================================
   // FOIZ O'ZGARISHI XRONOLOGIYASI MA'LUMOTLARI
-  // Har bir qadamda oldingi narxga va boshlang'ich narxga nisbatan % hisoblanadi
-  // =========================================================================
   const priceChangeTimeline = useMemo(() => {
     if (sortedRecords.length === 0) return [];
 
@@ -403,11 +597,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
       const prevItem = idx > 0 ? sortedRecords[idx - 1] : null;
       const prevPrice = prevItem ? Number(prevItem.price) || 0 : currentPrice;
 
-      // Oldingi narxga nisbatan
       const stepDiff = currentPrice - prevPrice;
       const stepPercent = prevPrice > 0 ? ((stepDiff / prevPrice) * 100).toFixed(1) : '0';
 
-      // Boshlang'ich narxga nisbatan umumiy
       const totalDiff = currentPrice - initialPrice;
       const totalPercent = initialPrice > 0 ? ((totalDiff / initialPrice) * 100).toFixed(1) : '0';
 
@@ -436,7 +628,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
       '№': idx + 1,
       'Sana': item.date,
       'Vaqt': item.systemTime,
-      'Moy nomi': item.partName,
+      'Avto ehtiyot qism nomi': item.partName,
+      'Kod': item.code || '',
+      'Maxsus belgisi': item.specialMark || '',
+      'Mashinadagi joyi': item.carPosition || '',
+      'Davlati': item.country || '',
       'Brend': item.brand,
       'Yetkazib beruvchi': item.supplierName,
       'Narxi ($ / USD)': item.price,
@@ -448,11 +644,12 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Narxlar tahlili');
 
-    const fileName = `Daewoo_Tahlil_${activePartName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const cleanTitle = activePartDisplayName.replace(/[^a-zA-Z0-9_]/g, '_');
+    const fileName = `Daewoo_Tahlil_${cleanTitle}_${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(workbook, fileName);
   };
 
-  // Tooltip komponenti (hech qanday "(Line)" so'zlarisiz)
+  // Tooltip komponenti
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
@@ -501,7 +698,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
       id="analytics-container"
       className="w-full max-w-full min-w-0 overflow-hidden space-y-3 sm:space-y-4 text-black text-xs sm:text-sm"
     >
-      {/* 1. Header Toolbar (Mobilga moslashtirilgan, ixcham) */}
+      {/* 1. Header Toolbar */}
       <div className="bg-yellow-100/95 border-2 border-amber-400 p-2.5 sm:p-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 rounded-none">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <div className="p-1.5 sm:p-2 bg-amber-400 border border-amber-600 text-black shrink-0">
@@ -510,14 +707,14 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
               <h1 className="text-sm sm:text-base md:text-lg font-black uppercase tracking-wider text-black font-heading truncate">
-                Moylar Narxlari Tahlili
+                Avto ehtiyot qismlar narxlar tahlili
               </h1>
               <span className="px-1.5 py-0.5 bg-amber-300 border border-amber-500 text-[10px] sm:text-xs font-black shrink-0">
-                {uniquePartNames.length} xil mahsulot
+                {activeFilters.length > 0 ? `${filteredData.length} ta tahliliy qayd` : `${parts.length} ta jami qayd`}
               </span>
             </div>
             <p className="text-[10px] sm:text-[11px] font-bold text-stone-700 truncate">
-              Tanlangan muddatda moy narxining o'zgarishi — har bir yetkazib beruvchi alohida chiziq sifatida
+              Tanlangan ehtiyot qismlar, brendlar, kodlar va parametrlar bo'yicha dinamika
             </p>
           </div>
         </div>
@@ -536,191 +733,228 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
         )}
       </div>
 
-      {/* 2. IYERARXIK FILTRLAR PANELI:
-          1-qadam: Sana muddati
-          2-qadam: Moy turi/nomi
-          3-qadam: Brend tanlash
-      */}
-      <div className="bg-white border-2 border-amber-400 p-2.5 sm:p-4 shadow-sm space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-3.5">
-          {/* 1-QADAM: SANA MUDDATI */}
-          <div className="bg-yellow-50/70 border border-amber-300 p-2 sm:p-2.5 flex flex-col justify-between space-y-2">
-            <div>
-              <div className="flex items-center gap-1 text-black font-black text-[11px] sm:text-xs uppercase mb-1">
-                <Calendar className="w-3.5 h-3.5 text-amber-700 stroke-[2.5]" />
-                <span>1-Qadam: Sana muddati</span>
-              </div>
-              <p className="text-[10px] text-stone-600 font-bold">
-                Tahlil qilinadigan sana oralig'i:
-              </p>
+      {/* ========================================================================= */}
+      {/* 2. TAHLIL BO'YICHA FILTRLASH PANELI:                                       */}
+      {/* 6 ta ko'p tanlovli parametr (Qism, Brend, Kod, Maxsus belgi, Joy, Davlat)  */}
+      {/* + 1 ta Sana oralig'i                                                      */}
+      {/* ========================================================================= */}
+      <div className="bg-yellow-50/95 border-2 border-amber-400 shadow-sm rounded-none">
+        {/* Panel Header */}
+        <div className="p-2.5 sm:p-3 bg-amber-200/90 border-b-2 border-amber-400 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="p-1 bg-amber-400 border border-amber-600 text-black">
+              <Filter className="w-4 h-4" />
             </div>
-
-            {/* Sana inputlari */}
-            <div className="grid grid-cols-2 gap-1.5">
-              <div>
-                <span className="text-[9px] uppercase font-bold text-stone-600 block">Dan:</span>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full px-1.5 py-1 text-[11px] border border-amber-400 bg-white font-bold text-black focus:outline-none rounded-none"
-                />
-              </div>
-              <div>
-                <span className="text-[9px] uppercase font-bold text-stone-600 block">Gacha:</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-1.5 py-1 text-[11px] border border-amber-400 bg-white font-bold text-black focus:outline-none rounded-none"
-                />
-              </div>
-            </div>
-
-            {/* Tezkor oraliq tugmalari */}
-            <div className="flex items-center gap-1 flex-wrap pt-1 border-t border-amber-200">
-              <button
-                type="button"
-                onClick={() => handleQuickDateFilter('all')}
-                className={`px-1.5 py-0.5 text-[10px] font-black border transition cursor-pointer ${
-                  !startDate && !endDate
-                    ? 'bg-amber-400 border-amber-600 text-black'
-                    : 'bg-white hover:bg-yellow-200 border-amber-300 text-stone-700'
-                }`}
-              >
-                Barchasi
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickDateFilter('30d')}
-                className="px-1.5 py-0.5 text-[10px] font-black bg-white hover:bg-yellow-200 border border-amber-300 text-stone-700 cursor-pointer"
-              >
-                30 kun
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickDateFilter('3m')}
-                className="px-1.5 py-0.5 text-[10px] font-black bg-white hover:bg-yellow-200 border border-amber-300 text-stone-700 cursor-pointer"
-              >
-                3 oy
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickDateFilter('year')}
-                className="px-1.5 py-0.5 text-[10px] font-black bg-white hover:bg-yellow-200 border border-amber-300 text-stone-700 cursor-pointer"
-              >
-                Joriy yil
-              </button>
-            </div>
-          </div>
-
-          {/* 2-QADAM: MOY TURI */}
-          <div className="bg-yellow-50/70 border border-amber-300 p-2 sm:p-2.5 flex flex-col justify-between space-y-2">
-            <div>
-              <div className="flex items-center gap-1 text-black font-black text-[11px] sm:text-xs uppercase mb-1">
-                <Droplet className="w-3.5 h-3.5 text-amber-700 stroke-[2.5]" />
-                <span>2-Qadam: Moy turi</span>
-              </div>
-              <p className="text-[10px] text-stone-600 font-bold">
-                Mavjud unikal moylardan tanlang:
-              </p>
-            </div>
-
-            <div>
-              {uniquePartNames.length === 0 ? (
-                <div className="p-2 bg-yellow-100 border border-amber-300 text-xs font-bold text-stone-700">
-                  Bazaga hali moy kiritilmagan
-                </div>
-              ) : (
-                <select
-                  value={activePartName}
-                  onChange={(e) => {
-                    setSelectedPartName(e.target.value);
-                    setSelectedBrand('ALL');
-                  }}
-                  className="w-full px-2 py-1.5 text-xs border-2 border-amber-400 bg-white font-black text-black focus:outline-none rounded-none truncate"
-                >
-                  {uniquePartNames.map((item) => (
-                    <option key={item.name} value={item.name}>
-                      {item.name} ({item.count} ta qayd)
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            <div className="text-[10px] sm:text-[11px] font-bold text-stone-700 flex items-center justify-between border-t border-amber-200 pt-1">
-              <span>Tanlangan:</span>
-              <span className="font-black text-black truncate max-w-[170px]">
-                {activePartName || 'Tanlanmagan'}
+            <span className="text-xs font-black uppercase tracking-wider text-black font-heading">
+              Tahliliy saralash va filtrlash
+            </span>
+            {activeFilters.length > 0 && (
+              <span className="px-2 py-0.5 bg-amber-400 border border-amber-600 font-mono font-black text-[11px] text-black">
+                {activeFilters.length} ta faol filtr
               </span>
-            </div>
+            )}
           </div>
 
-          {/* 3-QADAM: BREND TANLASH */}
-          <div className="bg-yellow-50/70 border border-amber-300 p-2 sm:p-2.5 flex flex-col justify-between space-y-2">
-            <div>
-              <div className="flex items-center gap-1 text-black font-black text-[11px] sm:text-xs uppercase mb-1">
-                <Tag className="w-3.5 h-3.5 text-amber-700 stroke-[2.5]" />
-                <span>3-Qadam: Brend tanlash</span>
-              </div>
-              <p className="text-[10px] text-stone-600 font-bold">
-                «{activePartName || 'Mahsulot'}» uchun brend:
-              </p>
-            </div>
-
-            <div>
-              <select
-                value={selectedBrand}
-                onChange={(e) => setSelectedBrand(e.target.value)}
-                disabled={availableBrands.length === 0}
-                className="w-full px-2 py-1.5 text-xs border-2 border-amber-400 bg-white font-black text-black focus:outline-none rounded-none disabled:bg-stone-100 disabled:text-stone-400 truncate"
-              >
-                <option value="ALL">-- Barcha brendlar ({availableBrands.length} ta) --</option>
-                {availableBrands.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center gap-1 flex-wrap border-t border-amber-200 pt-1 overflow-x-auto max-h-12">
+          <div className="flex items-center gap-2">
+            {activeFilters.length > 0 && (
               <button
                 type="button"
-                onClick={() => setSelectedBrand('ALL')}
-                className={`px-1.5 py-0.5 text-[10px] font-black border transition cursor-pointer ${
-                  selectedBrand === 'ALL'
-                    ? 'bg-amber-400 border-amber-600 text-black'
-                    : 'bg-white hover:bg-yellow-200 border-amber-300 text-stone-700'
-                }`}
+                onClick={resetAllFilters}
+                className="flex items-center gap-1 px-2.5 py-1 bg-rose-100 hover:bg-rose-200 border border-rose-400 text-rose-900 text-xs font-black transition cursor-pointer"
+                title="Barcha filtrlarni bekor qilish"
               >
-                Barchasi
+                <RotateCcw className="w-3 h-3" />
+                <span>Barchasini tozalash</span>
               </button>
-              {availableBrands.map((b) => (
+            )}
+            <button
+              type="button"
+              onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
+              className="flex items-center gap-1 px-2 py-1 bg-amber-300 hover:bg-amber-400 border border-amber-500 text-black text-xs font-black transition cursor-pointer"
+            >
+              <span>{isFilterPanelOpen ? 'Panelni yashirish' : 'Filtrlarni ochish'}</span>
+              {isFilterPanelOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Faol filtrlar chip-belgilari */}
+        {activeFilters.length > 0 && (
+          <div className="p-2 bg-yellow-100 border-b border-amber-300 flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] font-black uppercase text-stone-700 mr-1">Faol:</span>
+            {activeFilters.map((af) => (
+              <span
+                key={af.id}
+                className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-300 border border-amber-500 text-[11px] font-black text-black"
+              >
+                <span>{af.label}:</span>
+                <span className="text-amber-950 font-bold">{af.value}</span>
                 <button
-                  key={b}
                   type="button"
-                  onClick={() => setSelectedBrand(b)}
+                  onClick={af.clear}
+                  className="p-0.5 hover:bg-amber-400 rounded-none cursor-pointer"
+                  title="O'chirish"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Filtr formalar to'ri */}
+        {isFilterPanelOpen && (
+          <div className="p-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-black">
+            {/* 1. Qism nomi (Ko'p tanlovli) */}
+            <MultiSelectPickFilter
+              label="1. Qism nomi"
+              options={uniquePartNames}
+              counts={partNameCounts}
+              selected={filterPartNames}
+              onChange={setFilterPartNames}
+              placeholder="Barcha qismlar"
+            />
+
+            {/* 2. Brend (Ko'p tanlovli) */}
+            <MultiSelectPickFilter
+              label="2. Brend"
+              options={uniqueBrands}
+              counts={brandCounts}
+              selected={filterBrands}
+              onChange={setFilterBrands}
+              placeholder="Barcha brendlar"
+            />
+
+            {/* 3. Kod (Ko'p tanlovli) */}
+            <MultiSelectPickFilter
+              label="3. Kod"
+              options={uniqueCodes}
+              counts={codeCounts}
+              selected={filterCodes}
+              onChange={setFilterCodes}
+              placeholder="Barcha kodlar"
+            />
+
+            {/* 4. Maxsus belgisi (Ko'p tanlovli) */}
+            <MultiSelectPickFilter
+              label="4. Maxsus belgisi"
+              options={uniqueSpecialMarks}
+              counts={specialMarkCounts}
+              selected={filterSpecialMarks}
+              onChange={setFilterSpecialMarks}
+              placeholder="Barcha belgilar"
+            />
+
+            {/* 5. Mashinadagi joyi (Ko'p tanlovli) */}
+            <MultiSelectPickFilter
+              label="5. Mashinadagi joyi"
+              options={uniqueCarPositions}
+              counts={carPositionCounts}
+              selected={filterCarPositions}
+              onChange={setFilterCarPositions}
+              placeholder="Barcha joylar"
+            />
+
+            {/* 6. Ishlab chiqarilgan davlati (Ko'p tanlovli) */}
+            <MultiSelectPickFilter
+              label="6. Davlati"
+              options={uniqueCountries}
+              counts={countryCounts}
+              selected={filterCountries}
+              onChange={setFilterCountries}
+              placeholder="Barcha davlatlar"
+            />
+
+            {/* 7. Sana oralig'i (Dan - Gacha va tezkor tugmalar) */}
+            <div className="sm:col-span-2 space-y-1.5 bg-yellow-50/70 border border-amber-300 p-2">
+              <div className="flex items-center justify-between text-[10px] font-black uppercase text-stone-800">
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3 text-amber-700" />
+                  7. Sana oralig'i
+                </span>
+                {(startDate || endDate) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStartDate('');
+                      setEndDate('');
+                    }}
+                    className="text-rose-600 hover:text-rose-800 hover:underline text-[9px] font-bold cursor-pointer"
+                    title="Sana oralig'ini tozalash"
+                  >
+                    Tozalash
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="text-[9px] uppercase font-bold text-stone-600 block">Dan:</span>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className={`w-full px-1.5 py-1 text-[11px] font-bold border-2 bg-white text-black focus:outline-none rounded-none ${
+                      startDate ? 'border-amber-600 bg-amber-50 font-black' : 'border-amber-400'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <span className="text-[9px] uppercase font-bold text-stone-600 block">Gacha:</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className={`w-full px-1.5 py-1 text-[11px] font-bold border-2 bg-white text-black focus:outline-none rounded-none ${
+                      endDate ? 'border-amber-600 bg-amber-50 font-black' : 'border-amber-400'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 flex-wrap pt-1 border-t border-amber-200">
+                <button
+                  type="button"
+                  onClick={() => handleQuickDateFilter('all')}
                   className={`px-1.5 py-0.5 text-[10px] font-black border transition cursor-pointer ${
-                    selectedBrand === b
+                    !startDate && !endDate
                       ? 'bg-amber-400 border-amber-600 text-black'
                       : 'bg-white hover:bg-yellow-200 border-amber-300 text-stone-700'
                   }`}
                 >
-                  {b}
+                  Barchasi
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => handleQuickDateFilter('30d')}
+                  className="px-1.5 py-0.5 text-[10px] font-black bg-white hover:bg-yellow-200 border border-amber-300 text-stone-700 cursor-pointer"
+                >
+                  30 kun
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickDateFilter('3m')}
+                  className="px-1.5 py-0.5 text-[10px] font-black bg-white hover:bg-yellow-200 border border-amber-300 text-stone-700 cursor-pointer"
+                >
+                  3 oy
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickDateFilter('year')}
+                  className="px-1.5 py-0.5 text-[10px] font-black bg-white hover:bg-yellow-200 border border-amber-300 text-stone-700 cursor-pointer"
+                >
+                  Joriy yil
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ========================================================================= */}
-      {/* 3 TA QADAMNING PASTIDA: BUGUNGI KUNGA ENG ARZONINI KO'RSATISH VA BIR NECHTA
-          YETKAZIB BERUVCHIDA BIR XIL BO'LSA, HAR BIRINI TAHLILIY KO'RSATISH */}
+      {/* BUGUNGI KUNGA ENG ARZONINI KO'RSATISH                                      */}
       {/* ========================================================================= */}
-      {activePartName && cheapestSuppliersList.length > 0 && (
+      {cheapestSuppliersList.length > 0 && (
         <div className="bg-gradient-to-r from-emerald-50 via-yellow-50 to-emerald-50 border-2 border-emerald-600 p-3 sm:p-4 shadow-sm space-y-3">
           {/* Header xabari */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b-2 border-emerald-300 pb-2.5">
@@ -731,7 +965,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-black text-xs sm:text-sm uppercase tracking-wide text-emerald-950 font-heading">
-                    Bugungi kunga eng arzon taklif
+                    Tanlangan filtrlar bo'yicha eng arzon taklif
                   </h3>
                   {cheapestSuppliersList.length > 1 ? (
                     <span className="px-2 py-0.5 bg-amber-300 border border-amber-600 text-black text-[10px] font-black uppercase">
@@ -744,8 +978,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
                   )}
                 </div>
                 <p className="text-[11px] font-bold text-stone-700">
-                  Mahsulot: <span className="text-black font-black font-heading">{activePartName}</span>{' '}
-                  {selectedBrand !== 'ALL' && <span className="text-amber-800">({selectedBrand})</span>}
+                  Tahlil doirasi: <span className="text-black font-black font-heading">{activePartDisplayName}</span>
                 </p>
               </div>
             </div>
@@ -764,8 +997,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
             </div>
           </div>
 
-          {/* Agar bir nechta yetkazib beruvchida narx bir xil bo'lsa yoki bitta bo'lsa,
-              har birining to'liq tahliliy ma'lumotlari kartochkalari */}
+          {/* Kartochkalar */}
           <div
             className={`grid grid-cols-1 ${
               cheapestSuppliersList.length === 1
@@ -801,16 +1033,38 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
                       </span>
                     </div>
 
-                    {/* Faoliyat turi va aloqa */}
-                    <div className="flex items-center gap-2 flex-wrap text-[10px]">
-                      {supplierProfile?.activityType && (
-                        <span className="px-1.5 py-0.5 bg-yellow-200 border border-amber-400 font-bold uppercase text-black">
-                          Faoliyat: {supplierProfile.activityType}
-                        </span>
-                      )}
+                    {/* Qism nomi va parametrlar */}
+                    <div className="text-[11px] font-bold text-stone-900">
+                      <span>Qism: </span>
+                      <strong className="text-black">{quoteItem.partName}</strong>
+                    </div>
+
+                    {/* Qo'shimcha parametrlar: Kod, Maxsus belgi, Joyi, Davlati */}
+                    <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
                       {quoteItem.brand && (
                         <span className="px-1.5 py-0.5 bg-amber-100 border border-amber-400 font-black uppercase text-amber-900">
-                          Brend: {quoteItem.brand}
+                          {quoteItem.brand}
+                        </span>
+                      )}
+                      {quoteItem.code && (
+                        <span className="px-1.5 py-0.5 bg-stone-100 border border-stone-300 font-mono font-bold text-black">
+                          Kod: {quoteItem.code}
+                        </span>
+                      )}
+                      {quoteItem.specialMark && (
+                        <span className="px-1.5 py-0.5 bg-yellow-100 border border-amber-300 font-bold text-stone-800">
+                          Belgi: {quoteItem.specialMark}
+                        </span>
+                      )}
+                      {quoteItem.carPosition && (
+                        <span className="px-1.5 py-0.5 bg-yellow-100 border border-amber-300 font-bold text-stone-800">
+                          Joy: {quoteItem.carPosition}
+                        </span>
+                      )}
+                      {quoteItem.country && (
+                        <span className="px-1.5 py-0.5 bg-emerald-100 border border-emerald-400 text-emerald-900 font-bold flex items-center gap-0.5">
+                          <Globe className="w-2.5 h-2.5" />
+                          {quoteItem.country}
                         </span>
                       )}
                     </div>
@@ -859,24 +1113,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
                       </div>
                     </div>
 
-                    {/* Sifat, Shaffoflik va Intizom darajasi */}
-                    {supplierProfile && (
-                      <div className="grid grid-cols-3 gap-1 text-[9px] font-bold text-center">
-                        <div className="p-1 bg-white border border-amber-200">
-                          <span className="text-stone-500 block">Sifat:</span>
-                          <span className="text-emerald-800 font-black">{supplierProfile.qualityStability}</span>
-                        </div>
-                        <div className="p-1 bg-white border border-amber-200">
-                          <span className="text-stone-500 block">Shaffoflik:</span>
-                          <span className="text-stone-800 font-black">{supplierProfile.transparencyLevel}</span>
-                        </div>
-                        <div className="p-1 bg-white border border-amber-200">
-                          <span className="text-stone-500 block">Intizom:</span>
-                          <span className="text-stone-800 font-black">{supplierProfile.disciplineLevel}</span>
-                        </div>
-                      </div>
-                    )}
-
                     {/* Qayd vaqti, Manba va Izoh */}
                     <div className="border-t border-emerald-200 pt-1 text-[10px] text-stone-600 space-y-0.5">
                       <div className="flex items-center justify-between">
@@ -912,14 +1148,25 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
         </div>
       )}
 
-      {/* 3. ASOSIY TAHLIL VA GRAFIK QISMI */}
+      {/* ========================================================================= */}
+      {/* 3. ASOSIY TAHLIL VA GRAFIK QISMI                                          */}
+      {/* ========================================================================= */}
       {sortedRecords.length === 0 ? (
         <div className="p-6 sm:p-8 text-center bg-yellow-50 border-2 border-amber-300 text-black space-y-2">
           <Info className="w-7 h-7 sm:w-8 sm:h-8 text-amber-600 mx-auto opacity-75" />
           <h3 className="font-black text-xs sm:text-sm uppercase">Tanlangan parametrlar bo'yicha ma'lumot topilmadi</h3>
           <p className="text-[11px] sm:text-xs text-stone-600 max-w-md mx-auto">
-            Belgilangan sana oralig'ida yoki brend bo'yicha yozuvlar mavjud emas. Sana oralig'ini kengaytirib ko'ring yoki «Barcha brendlar» variantini tanlang.
+            Belgilangan filtrlar bo'yicha yozuvlar mavjud emas. Yuqoridagi filtrlarni tozalang yoki parametrlarini kengaytiring.
           </p>
+          {activeFilters.length > 0 && (
+            <button
+              type="button"
+              onClick={resetAllFilters}
+              className="mt-2 px-3 py-1.5 bg-amber-400 hover:bg-amber-500 border border-amber-600 text-black font-black text-xs cursor-pointer"
+            >
+              Filtrlarni tozalash
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-3 sm:space-y-4">
@@ -1017,8 +1264,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
           )}
 
           {/* ========================================================================= */}
-          {/* TAHLILIY CHIZMALAR: HAR BIR CHIZIQ BITTA YETKAZIB BERUVCHI
-              (Oval egrisimon natural chiziqlar) */}
+          {/* TAHLILIY CHIZMALAR: HAR BIR CHIZIQ BITTA YETKAZIB BERUVCHI                 */}
           {/* ========================================================================= */}
           <div className="bg-white border-2 border-amber-400 p-2.5 sm:p-4 md:p-5 shadow-sm space-y-3 w-full max-w-full overflow-hidden">
             {/* Sarlavha va boshqaruv */}
@@ -1029,7 +1275,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
                     Tahliliy chizmalar
                   </span>
                   <h2 className="font-black text-xs sm:text-sm md:text-base uppercase tracking-wider text-black font-heading truncate">
-                    {activePartName} — Narxlar Tahliliy Chizmalari
+                    {activePartDisplayName} — Narxlar Tahliliy Chizmalari
                   </h2>
                 </div>
                 <p className="text-[10px] sm:text-[11px] text-stone-700 font-bold mt-0.5">
@@ -1136,7 +1382,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
               </div>
             </div>
 
-            {/* RECHARTS CHIZMALAR GRAFIGI (OVAL / NATURAL CURVE) */}
+            {/* RECHARTS CHIZMALAR GRAFIGI */}
             <div className="w-full min-w-0 h-64 sm:h-80 md:h-96 pt-1 overflow-hidden">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
@@ -1145,7 +1391,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#fde68a" vertical={false} />
 
-                  {/* X o'qi: Sanalar */}
                   <XAxis
                     dataKey="date"
                     stroke="#44403c"
@@ -1153,7 +1398,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
                     dy={5}
                   />
 
-                  {/* Y o'qi: Narxi ($ / USD) */}
                   <YAxis
                     width={56}
                     stroke="#44403c"
@@ -1173,7 +1417,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
                     wrapperStyle={{ fontSize: 10, fontWeight: 800, paddingBottom: 6 }}
                   />
 
-                  {/* HAR BIR YETKAZIB BERUVCHI UCHUN BITTA CHIZIQ (Egrisimon oval: type="natural") */}
                   {involvedSuppliers.map((supplier) => {
                     if (hiddenSuppliers.has(supplier)) return null;
 
@@ -1186,36 +1429,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
                         dataKey={supplier}
                         name={supplier}
                         stroke={color}
-                        strokeWidth={3.5}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        dot={{
-                          r: 5,
-                          strokeWidth: 2,
-                          fill: '#ffffff',
-                          stroke: color,
-                        }}
-                        activeDot={{
-                          r: 7,
-                          strokeWidth: 2.5,
-                          fill: color,
-                          stroke: '#000000',
-                        }}
+                        strokeWidth={2.5}
+                        dot={{ r: 4, stroke: '#000', strokeWidth: 1, fill: color }}
+                        activeDot={{ r: 6, stroke: '#000', strokeWidth: 2, fill: color }}
                         connectNulls={true}
-                        label={
-                          showDataLabels
-                            ? {
-                                position: 'top',
-                                formatter: (v: any) =>
-                                  v ? `${(Number(v) / 1000).toFixed(0)}k` : '',
-                                style: {
-                                  fontSize: 9,
-                                  fontWeight: 800,
-                                  fill: color,
-                                },
-                              }
-                            : false
-                        }
+                        isAnimationActive={false}
                       />
                     );
                   })}
@@ -1225,77 +1443,84 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
           </div>
 
           {/* ========================================================================= */}
-          {/* YETKAZIB BERUVCHILAR BO'YICHA TAQQOSLAMA JADVALI */}
+          {/* YETKAZIB BERUVCHILAR QIYOSIY JADVALI                                      */}
           {/* ========================================================================= */}
           <div className="bg-white border-2 border-amber-400 shadow-sm overflow-hidden w-full max-w-full">
-            <div className="p-2.5 sm:p-3 bg-yellow-200 border-b-2 border-amber-400 flex items-center justify-between">
-              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-black stroke-[2.5] shrink-0" />
+            <div className="p-2.5 sm:p-3 bg-yellow-100 border-b-2 border-amber-300 flex items-center justify-between">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-black stroke-[2.5]" />
                 <h3 className="font-black text-[11px] sm:text-xs uppercase tracking-wider text-black font-heading truncate">
-                  Yetkazib beruvchilar bo'yicha qiyosiy ko'rsatkichlar
+                  Yetkazib beruvchilar narxlari qiyosiy jadvali
                 </h3>
               </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-stone-800 shrink-0">
+              <span className="text-[10px] sm:text-[11px] font-black text-stone-800">
                 {supplierSummary.length} ta yetkazib beruvchi
               </span>
             </div>
 
             <div className="w-full overflow-x-auto">
-              <table className="w-full min-w-[620px] sm:min-w-[700px] border-collapse text-left text-[11px] sm:text-xs">
+              <table className="w-full min-w-[700px] border-collapse text-left text-[11px] sm:text-xs">
                 <thead>
-                  <tr className="bg-yellow-100 border-b border-amber-300 text-black text-[9px] sm:text-[10px] font-black uppercase">
-                    <th className="p-2 border-r border-amber-200">Yetkazib beruvchi (Chiziq rangi)</th>
-                    <th className="p-2 border-r border-amber-200 text-right">Oxirgi narxi</th>
-                    <th className="p-2 border-r border-amber-200 text-right">Eng arzon</th>
-                    <th className="p-2 border-r border-amber-200 text-right">Eng yuqori</th>
-                    <th className="p-2 border-r border-amber-200 text-right">O'rtacha</th>
-                    <th className="p-2 border-r border-amber-200 text-center">Qaydlar</th>
-                    <th className="p-2 border-r border-amber-200 text-center">Oxirgi sana</th>
-                    <th className="p-2 text-center">Holat</th>
+                  <tr className="bg-yellow-200 border-b border-amber-400 text-black text-[9px] sm:text-[10px] font-black uppercase">
+                    <th className="p-2 border-r border-amber-300 text-center w-10">№</th>
+                    <th className="p-2 border-r border-amber-300">Yetkazib beruvchi</th>
+                    <th className="p-2 border-r border-amber-300 text-center w-20">Qaydlar soni</th>
+                    <th className="p-2 border-r border-amber-300 text-right w-24">Eng past ($)</th>
+                    <th className="p-2 border-r border-amber-300 text-right w-24">O'rtacha ($)</th>
+                    <th className="p-2 border-r border-amber-300 text-right w-24">Eng yuqori ($)</th>
+                    <th className="p-2 border-r border-amber-300 text-right w-24">Oxirgi narx ($)</th>
+                    <th className="p-2 text-center w-24">Oxirgi sana</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-amber-200">
-                  {supplierSummary.map((item, idx) => {
-                    const isCheapest = stats && item.minPrice === stats.minPrice;
+                  {supplierSummary.map((row, idx) => {
+                    const isCheapestLatest = row.latestPrice === cheapestCurrentPrice;
+
                     return (
                       <tr
-                        key={item.supplier}
-                        className={idx % 2 === 0 ? 'bg-white' : 'bg-yellow-50/40'}
+                        key={row.supplier}
+                        className={
+                          isCheapestLatest
+                            ? 'bg-emerald-50/70 font-bold'
+                            : idx % 2 === 0
+                            ? 'bg-white'
+                            : 'bg-yellow-50/40'
+                        }
                       >
-                        <td className="p-2 border-r border-amber-200 font-bold text-black flex items-center gap-2">
-                          <span
-                            className="w-3.5 h-1.5 inline-block border border-black/30 shrink-0"
-                            style={{ backgroundColor: item.color }}
-                          />
-                          <span className="break-words">{item.supplier}</span>
-                        </td>
-                        <td className="p-2 border-r border-amber-200 text-right font-mono font-black text-black whitespace-nowrap">
-                          {formatUSD(item.latestPrice)}
-                        </td>
-                        <td className="p-2 border-r border-amber-200 text-right font-mono font-black text-emerald-800 whitespace-nowrap">
-                          {formatUSD(item.minPrice)}
-                        </td>
-                        <td className="p-2 border-r border-amber-200 text-right font-mono font-black text-rose-800 whitespace-nowrap">
-                          {formatUSD(item.maxPrice)}
-                        </td>
-                        <td className="p-2 border-r border-amber-200 text-right font-mono font-black text-stone-800 whitespace-nowrap">
-                          {formatUSD(item.avgPrice)}
-                        </td>
                         <td className="p-2 border-r border-amber-200 text-center font-mono font-black">
-                          {item.count}
+                          {idx + 1}
                         </td>
-                        <td className="p-2 border-r border-amber-200 text-center font-mono text-[10px] sm:text-[11px] text-stone-700 whitespace-nowrap">
-                          {item.latestDate}
+                        <td className="p-2 border-r border-amber-200 font-black text-black">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="w-3 h-3 shrink-0 inline-block border border-black/30"
+                              style={{ backgroundColor: row.color }}
+                            />
+                            <span>{row.supplier}</span>
+                            {isCheapestLatest && (
+                              <span className="px-1.5 py-0.2 bg-emerald-200 border border-emerald-500 text-[9px] font-black uppercase text-emerald-900">
+                                Eng yaxshi narx
+                              </span>
+                            )}
+                          </div>
                         </td>
-                        <td className="p-2 text-center whitespace-nowrap">
-                          {isCheapest ? (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-100 border border-emerald-500 text-emerald-900 font-black text-[9px] sm:text-[10px]">
-                              <CheckCircle2 className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-emerald-700" />
-                              Eng arzon
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-stone-600 font-bold">Standard</span>
-                          )}
+                        <td className="p-2 border-r border-amber-200 text-center font-mono font-bold">
+                          {row.count} ta
+                        </td>
+                        <td className="p-2 border-r border-amber-200 text-right font-mono font-black text-emerald-800">
+                          {formatUSD(row.minPrice)}
+                        </td>
+                        <td className="p-2 border-r border-amber-200 text-right font-mono font-bold text-stone-800">
+                          {formatUSD(row.avgPrice)}
+                        </td>
+                        <td className="p-2 border-r border-amber-200 text-right font-mono font-bold text-rose-800">
+                          {formatUSD(row.maxPrice)}
+                        </td>
+                        <td className="p-2 border-r border-amber-200 text-right font-mono font-black text-black">
+                          {formatUSD(row.latestPrice)}
+                        </td>
+                        <td className="p-2 text-center font-mono text-[10px] text-stone-700">
+                          {row.latestDate}
                         </td>
                       </tr>
                     );
@@ -1306,7 +1531,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
           </div>
 
           {/* ========================================================================= */}
-          {/* XRONOLOGIK O'ZGARISHLAR TARIXI RO'YXATI */}
+          {/* XRONOLOGIK O'ZGARISHLAR TARIXI RO'YXATI                                    */}
           {/* ========================================================================= */}
           <div className="bg-white border-2 border-amber-400 shadow-sm overflow-hidden w-full max-w-full">
             <div className="p-2.5 sm:p-3 bg-yellow-100 border-b-2 border-amber-300 flex items-center justify-between">
@@ -1321,13 +1546,18 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
               </span>
             </div>
 
-            <div className="w-full overflow-x-auto max-h-64 sm:max-h-72">
-              <table className="w-full min-w-[650px] border-collapse text-left text-[11px] sm:text-xs">
+            <div className="w-full overflow-x-auto max-h-72">
+              <table className="w-full min-w-[1100px] border-collapse text-left text-[11px] sm:text-xs">
                 <thead className="sticky top-0 z-10 bg-yellow-200 border-b border-amber-400 text-black text-[9px] sm:text-[10px] font-black uppercase">
                   <tr>
                     <th className="p-1.5 border-r border-amber-300 text-center w-8">№</th>
                     <th className="p-1.5 border-r border-amber-300 w-24 text-center">Sana</th>
                     <th className="p-1.5 border-r border-amber-300 w-24">Vaqt</th>
+                    <th className="p-1.5 border-r border-amber-300 w-36">Qism nomi</th>
+                    <th className="p-1.5 border-r border-amber-300 w-24">Kod</th>
+                    <th className="p-1.5 border-r border-amber-300 w-28">Maxsus belgisi</th>
+                    <th className="p-1.5 border-r border-amber-300 w-28">Mashinadagi joyi</th>
+                    <th className="p-1.5 border-r border-amber-300 w-24">Davlati</th>
                     <th className="p-1.5 border-r border-amber-300 w-20">Brend</th>
                     <th className="p-1.5 border-r border-amber-300">Yetkazib beruvchi</th>
                     <th className="p-1.5 border-r border-amber-300 text-right w-24">Narx ($)</th>
@@ -1344,13 +1574,18 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
                       <td className="p-1.5 border-r border-amber-200 text-center font-mono font-black">{idx + 1}</td>
                       <td className="p-1.5 border-r border-amber-200 text-center font-mono font-bold text-black whitespace-nowrap">{item.date}</td>
                       <td className="p-1.5 border-r border-amber-200 font-mono text-[9px] sm:text-[10px] text-stone-600 whitespace-nowrap">{item.systemTime}</td>
+                      <td className="p-1.5 border-r border-amber-200 font-black text-black break-words">{item.partName}</td>
+                      <td className="p-1.5 border-r border-amber-200 font-mono text-[10px] text-stone-800 font-bold">{item.code || '—'}</td>
+                      <td className="p-1.5 border-r border-amber-200 text-stone-800 text-[10px]">{item.specialMark || '—'}</td>
+                      <td className="p-1.5 border-r border-amber-200 text-stone-800 text-[10px]">{item.carPosition || '—'}</td>
+                      <td className="p-1.5 border-r border-amber-200 font-bold text-stone-900">{item.country || '—'}</td>
                       <td className="p-1.5 border-r border-amber-200 font-bold text-[10px] uppercase text-black">{item.brand}</td>
                       <td className="p-1.5 border-r border-amber-200 font-bold text-stone-900">{item.supplierName}</td>
                       <td className="p-1.5 border-r border-amber-200 text-right font-mono font-black text-black whitespace-nowrap">
                         {formatUSD(item.price)}
                       </td>
                       <td className="p-1.5 border-r border-amber-200 text-stone-700 text-[10px] sm:text-[11px]">{item.source}</td>
-                      <td className="p-1.5 text-stone-600 text-[10px] sm:text-[11px]">{item.comment}</td>
+                      <td className="p-1.5 text-stone-600 text-[10px] sm:text-[11px]">{item.comment || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1359,8 +1594,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
           </div>
 
           {/* ========================================================================= */}
-          {/* ENG PASTDA: MAHSULOT NARX O'ZGARISHI FOIZ XRONOLOGIYASI
-              (Qancha foizga oshganini ko'rsatuvchi xronologiya) */}
+          {/* NARX O'ZGARISHI FOIZ XRONOLOGIYASI                                        */}
           {/* ========================================================================= */}
           <div className="bg-white border-2 border-amber-500 shadow-sm p-3 sm:p-4 space-y-3 w-full max-w-full">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b-2 border-amber-300 pb-2.5">
@@ -1373,7 +1607,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
                     Narx O'zgarishi Foiz Xronologiyasi
                   </h3>
                   <p className="text-[10px] sm:text-[11px] text-stone-600 font-bold">
-                    «{activePartName}» mahsulotining har bir qayd bo'yicha narx o'sishi / pasayishi dinamikasi
+                    {activePartDisplayName} bo'yicha har bir qaydda narx o'sishi / pasayishi dinamikasi
                   </p>
                 </div>
               </div>
@@ -1407,7 +1641,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
               {priceChangeTimeline.map((step) => {
                 const isPositive = step.stepDiff > 0;
                 const isNegative = step.stepDiff < 0;
-                const isZero = step.stepDiff === 0;
 
                 const isTotalPositive = step.totalDiff > 0;
                 const isTotalNegative = step.totalDiff < 0;
@@ -1441,9 +1674,22 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
                             <span className="text-[10px] text-stone-500 font-mono">
                               {step.item.systemTime}
                             </span>
+                            <span className="font-bold text-black text-xs">
+                              {step.item.partName}
+                            </span>
                             <span className="px-1.5 py-0.2 bg-amber-200 border border-amber-400 text-[10px] font-bold text-black uppercase">
                               {step.item.brand}
                             </span>
+                            {step.item.code && (
+                              <span className="px-1 py-0.2 bg-stone-100 border border-stone-300 font-mono text-[9px]">
+                                {step.item.code}
+                              </span>
+                            )}
+                            {step.item.country && (
+                              <span className="px-1 py-0.2 bg-emerald-100 border border-emerald-300 text-[9px] text-emerald-900 font-bold">
+                                {step.item.country}
+                              </span>
+                            )}
                           </div>
                           <p className="text-xs font-black text-stone-900 truncate">
                             {step.item.supplierName}

@@ -55,17 +55,21 @@ export function exportSuppliersToExcel(suppliers: Supplier[], fileNamePrefix = '
   XLSX.writeFile(workbook, fullFileName);
 }
 
-export function exportAutoPartsToExcel(parts: AutoPart[], fileNamePrefix = 'Daewoo_Moylar') {
+export function exportAutoPartsToExcel(parts: AutoPart[], fileNamePrefix = 'Daewoo_Avto_ehtiyot_qismlar') {
   const exportData = parts.map((item) => ({
     '№ (Tartib raqam)': item.orderNumber,
     'Sistema vaqti': item.systemTime,
-    'Moy nomi': item.partName,
+    'Avto ehtiyot qism nomi': item.partName,
+    'Kod': item.code || '',
+    'Maxsus belgisi': item.specialMark || '',
+    'Mashinada joylashgan joyi': item.carPosition || '',
+    'Ishlab chiqarilgan davlati': item.country || '',
     'Brend': item.brand,
     'Yetkazib beruvchi': item.supplierName,
     'Narx ($ / USD)': item.price,
     'Sana': item.date,
     'Ma\'lumot manbaasi': item.source,
-    'Izoh': item.comment,
+    'Izoh': item.comment || '',
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -73,7 +77,11 @@ export function exportAutoPartsToExcel(parts: AutoPart[], fileNamePrefix = 'Daew
   worksheet['!cols'] = [
     { wch: 8 },  // №
     { wch: 22 }, // Sistema vaqti
-    { wch: 28 }, // Moy nomi
+    { wch: 28 }, // Avto ehtiyot qism nomi
+    { wch: 16 }, // Kod
+    { wch: 18 }, // Maxsus belgisi
+    { wch: 24 }, // Mashinada joylashgan joyi
+    { wch: 22 }, // Ishlab chiqarilgan davlati
     { wch: 18 }, // Brend
     { wch: 26 }, // Yetkazib beruvchi
     { wch: 18 }, // Narx
@@ -83,7 +91,7 @@ export function exportAutoPartsToExcel(parts: AutoPart[], fileNamePrefix = 'Daew
   ];
 
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Moylar');
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Avto ehtiyot qismlar');
 
   const dateStr = new Date().toISOString().split('T')[0];
   const fullFileName = `${fileNamePrefix}_${dateStr}.xlsx`;

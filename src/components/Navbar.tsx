@@ -154,7 +154,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             </button>
 
-            {/* 2-Jadval: Moylar */}
+            {/* 2-Jadval: Avto ehtiyot qismlar */}
             <button
               type="button"
               onClick={() => onTabChange('autoparts')}
@@ -163,10 +163,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                   ? 'bg-amber-400 border-amber-600 text-black shadow-xs ring-1 ring-amber-500'
                   : 'bg-yellow-200/80 hover:bg-yellow-300 border-amber-400 text-stone-800'
               }`}
-              title="2-Jadval: Moylar"
+              title="2-Jadval: Avto ehtiyot qismlar"
             >
               <Droplet className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[2.5] shrink-0" />
-              <span className="truncate">2-Jadval (Moylar)</span>
+              <span className="truncate">2-Jadval (Avto ehtiyot qismlar)</span>
               <span
                 className={`hidden sm:inline-block px-1 py-0.2 bg-white border border-amber-500 text-[9px] font-mono font-black shrink-0 ${
                   activeTab === 'autoparts' ? 'text-black' : 'text-stone-700'

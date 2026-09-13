@@ -8,14 +8,16 @@ import {
   orderBy,
   Unsubscribe,
 } from 'firebase/firestore';
+import firebaseConfig from '../../firebase-applet-config.json';
 import { db } from './firebase';
 import { Supplier, AutoPart, SupplierFormData, AutoPartFormData } from '../types';
 
 const SUPPLIERS_COLLECTION = 'suppliers';
 const AUTOPARTS_COLLECTION = 'auto_parts';
 
-const SUPPLIERS_CACHE_KEY = 'daewoo_suppliers_cache';
-const AUTOPARTS_CACHE_KEY = 'daewoo_autoparts_cache';
+const DB_ID = firebaseConfig.firestoreDatabaseId || 'default';
+const SUPPLIERS_CACHE_KEY = `daewoo_suppliers_cache_${DB_ID}`;
+const AUTOPARTS_CACHE_KEY = `daewoo_autoparts_cache_${DB_ID}`;
 
 // Load cached data
 export function cleanForFirestore<T extends Record<string, any>>(obj: T): Record<string, any> {
@@ -51,154 +53,6 @@ export function getCachedAutoParts(): AutoPart[] {
   }
 }
 
-// Initial sample suppliers if completely empty
-const INITIAL_SAMPLE_SUPPLIERS: Supplier[] = [
-  {
-    id: 'sup_init_1',
-    orderNumber: 1,
-    systemTime: '08.09.2026, 09:15:20',
-    createdAt: 1788858920000,
-    activityType: 'yuridik',
-    name: '"Avto Detal Servis" MCHJ',
-    address: 'Toshkent sh., Chilonzor tumani, Bunyodkor shoh ko\'chasi, 42',
-    phone: '+998 90 123 45 67',
-    paymentMethod: 'bank orqali',
-    paymentCondition: 'naqd joyida',
-    qualityStability: 'yaxshi',
-    transparencyLevel: 'shaffof',
-    responsibility: 'mahsulot sifatiga javob beradi',
-    disciplineLevel: 'vaqtida',
-    extras: 'yetkazib berish (bepul)',
-    products: ['Filtrlar', 'Tormoz kolodkasi', 'Amortizator'],
-  },
-  {
-    id: 'sup_init_2',
-    orderNumber: 2,
-    systemTime: '08.09.2026, 11:30:00',
-    createdAt: 1788867000000,
-    activityType: 'jismoniy',
-    name: 'Karimov Rustam Baxtiyorovich (YATT)',
-    address: 'Samarqand sh., Gagarin ko\'chasi, 15',
-    phone: '+998 93 987 65 43',
-    paymentMethod: 'naqd',
-    paymentCondition: 'kechiktirib to\'lash',
-    delayDays: '15',
-    qualityStability: 'yaxshi',
-    transparencyLevel: 'shaffof',
-    responsibility: 'mahsulot sifatiga javob beradi',
-    disciplineLevel: 'vaqtida',
-    extras: 'yetkazib berish (pulli)',
-    products: ['Svecha', 'Moy filtri', 'Generator remeni'],
-  },
-];
-
-const INITIAL_SAMPLE_AUTOPARTS: AutoPart[] = [
-  {
-    id: 'part_init_1',
-    orderNumber: 1,
-    systemTime: '15.08.2026, 09:30:00',
-    createdAt: 1786786200000,
-    partName: 'Oldi tormoz kolodkasi',
-    brand: 'Sangsin Hi-Q',
-    supplierName: '"Avto Detal Servis" MCHJ',
-    price: 14.50,
-    date: '2026-08-15',
-    source: 'Rasmiy diler',
-    comment: 'Cobalt va Gentra uchun original partiya',
-  },
-  {
-    id: 'part_init_2',
-    orderNumber: 2,
-    systemTime: '20.08.2026, 11:15:00',
-    createdAt: 1787222100000,
-    partName: 'Oldi tormoz kolodkasi',
-    brand: 'Sangsin Hi-Q',
-    supplierName: 'Karimov Rustam Baxtiyorovich (YATT)',
-    price: 15.00,
-    date: '2026-08-20',
-    source: 'Ulgurji bozor',
-    comment: 'Koreya quti, sifatli',
-  },
-  {
-    id: 'part_init_3',
-    orderNumber: 3,
-    systemTime: '28.08.2026, 14:00:00',
-    createdAt: 1787916000000,
-    partName: 'Oldi tormoz kolodkasi',
-    brand: 'Sangsin Hi-Q',
-    supplierName: '"Avto Detal Servis" MCHJ',
-    price: 15.20,
-    date: '2026-08-28',
-    source: 'Rasmiy diler',
-    comment: 'Yangi import partiyasi',
-  },
-  {
-    id: 'part_init_4',
-    orderNumber: 4,
-    systemTime: '02.09.2026, 10:20:00',
-    createdAt: 1788344400000,
-    partName: 'Oldi tormoz kolodkasi',
-    brand: 'Sangsin Hi-Q',
-    supplierName: 'Karimov Rustam Baxtiyorovich (YATT)',
-    price: 14.80,
-    date: '2026-09-02',
-    source: 'Bozor',
-    comment: 'Chegirma bilan berildi',
-  },
-  {
-    id: 'part_init_5',
-    orderNumber: 5,
-    systemTime: '08.09.2026, 10:00:15',
-    createdAt: 1788861615000,
-    partName: 'Oldi tormoz kolodkasi',
-    brand: 'Sangsin Hi-Q',
-    supplierName: '"Avto Detal Servis" MCHJ',
-    price: 15.50,
-    date: '2026-09-08',
-    source: 'Rasmiy diler',
-    comment: 'Oxirgi kelgan narx, kafolat 6 oy',
-  },
-  {
-    id: 'part_init_6',
-    orderNumber: 6,
-    systemTime: '25.08.2026, 11:45:00',
-    createdAt: 1787654700000,
-    partName: 'Moy filtri (Oil Filter)',
-    brand: 'Mann Filter',
-    supplierName: 'Karimov Rustam Baxtiyorovich (YATT)',
-    price: 3.50,
-    date: '2026-08-25',
-    source: 'Ulgurji bozor',
-    comment: 'Nexia 3, Spark uchun',
-  },
-  {
-    id: 'part_init_7',
-    orderNumber: 7,
-    systemTime: '08.09.2026, 11:45:00',
-    createdAt: 1788867900000,
-    partName: 'Moy filtri (Oil Filter)',
-    brand: 'Mann Filter',
-    supplierName: '"Avto Detal Servis" MCHJ',
-    price: 3.75,
-    date: '2026-09-08',
-    source: 'Do\'kon',
-    comment: 'Germaniya zavod',
-  },
-  {
-    id: 'part_init_8',
-    orderNumber: 8,
-    systemTime: '08.09.2026, 12:20:30',
-    createdAt: 1788870030000,
-    partName: 'Oldi amortizator',
-    brand: 'Mando',
-    supplierName: '"Avto Detal Servis" MCHJ',
-    price: 28.00,
-    date: '2026-09-07',
-    source: 'Koreya import',
-    comment: 'Laziz va gaz-moyli, zavod kafolati mavjud',
-  },
-];
-
 // Subscribe to Suppliers
 export function subscribeSuppliers(
   callback: (suppliers: Supplier[]) => void,
@@ -210,19 +64,6 @@ export function subscribeSuppliers(
   return onSnapshot(
     q,
     (snapshot) => {
-      if (snapshot.empty && !localStorage.getItem('daewoo_suppliers_seeded')) {
-        // Seed initial data to firestore if empty
-        localStorage.setItem('daewoo_suppliers_seeded', 'true');
-        INITIAL_SAMPLE_SUPPLIERS.forEach((item) => {
-          setDoc(doc(db, SUPPLIERS_COLLECTION, item.id), cleanForFirestore(item)).catch((err) => {
-            console.warn('Seeding supplier error:', err);
-          });
-        });
-        callback(INITIAL_SAMPLE_SUPPLIERS);
-        localStorage.setItem(SUPPLIERS_CACHE_KEY, JSON.stringify(INITIAL_SAMPLE_SUPPLIERS));
-        return;
-      }
-
       const items: Supplier[] = [];
       snapshot.forEach((docSnap) => {
         items.push({ id: docSnap.id, ...(docSnap.data() as Omit<Supplier, 'id'>) });
@@ -257,18 +98,6 @@ export function subscribeAutoParts(
   return onSnapshot(
     q,
     (snapshot) => {
-      if (snapshot.empty && !localStorage.getItem('daewoo_autoparts_seeded')) {
-        localStorage.setItem('daewoo_autoparts_seeded', 'true');
-        INITIAL_SAMPLE_AUTOPARTS.forEach((item) => {
-          setDoc(doc(db, AUTOPARTS_COLLECTION, item.id), cleanForFirestore(item)).catch((err) => {
-            console.warn('Seeding autopart error:', err);
-          });
-        });
-        callback(INITIAL_SAMPLE_AUTOPARTS);
-        localStorage.setItem(AUTOPARTS_CACHE_KEY, JSON.stringify(INITIAL_SAMPLE_AUTOPARTS));
-        return;
-      }
-
       const items: AutoPart[] = [];
       snapshot.forEach((docSnap) => {
         items.push({ id: docSnap.id, ...(docSnap.data() as Omit<AutoPart, 'id'>) });
@@ -437,6 +266,10 @@ export async function saveAutoPartToDb(
     const updated: AutoPart = {
       ...existingPart,
       partName: data.partName.trim(),
+      code: (data.code || '').trim(),
+      specialMark: (data.specialMark || '').trim(),
+      carPosition: (data.carPosition || '').trim(),
+      country: data.country.trim(),
       brand: data.brand.trim(),
       supplierName: data.supplierName.trim(),
       price: numericPrice,
@@ -454,6 +287,10 @@ export async function saveAutoPartToDb(
       systemTime,
       createdAt: now.getTime(),
       partName: data.partName.trim(),
+      code: (data.code || '').trim(),
+      specialMark: (data.specialMark || '').trim(),
+      carPosition: (data.carPosition || '').trim(),
+      country: data.country.trim(),
       brand: data.brand.trim(),
       supplierName: data.supplierName.trim(),
       price: numericPrice,

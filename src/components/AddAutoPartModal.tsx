@@ -51,12 +51,16 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
 
   const [formData, setFormData] = useState<AutoPartFormData>({
     partName: '',
+    code: '',
+    specialMark: '',
+    carPosition: '',
+    country: '',
+    comment: '',
     brand: '',
     supplierName: '',
     price: '',
     date: getTodayDate(),
     source: '',
-    comment: '',
   });
 
   const [selectedTemplatePartId, setSelectedTemplatePartId] = useState<string>('');
@@ -77,6 +81,10 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
     return sortedExistingParts.filter(
       (p) =>
         p.partName.toLowerCase().includes(query) ||
+        (p.code && p.code.toLowerCase().includes(query)) ||
+        (p.country && p.country.toLowerCase().includes(query)) ||
+        (p.specialMark && p.specialMark.toLowerCase().includes(query)) ||
+        (p.carPosition && p.carPosition.toLowerCase().includes(query)) ||
         p.brand.toLowerCase().includes(query) ||
         p.supplierName.toLowerCase().includes(query)
     );
@@ -90,22 +98,30 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
       if (initialPart) {
         setFormData({
           partName: initialPart.partName,
+          code: initialPart.code || '',
+          specialMark: initialPart.specialMark || '',
+          carPosition: initialPart.carPosition || '',
+          country: initialPart.country || '',
+          comment: initialPart.comment || '',
           brand: initialPart.brand,
           supplierName: initialPart.supplierName,
           price: String(initialPart.price),
           date: initialPart.date || getTodayDate(),
           source: initialPart.source,
-          comment: initialPart.comment,
         });
       } else {
         setFormData({
           partName: '',
+          code: '',
+          specialMark: '',
+          carPosition: '',
+          country: '',
+          comment: '',
           brand: '',
           supplierName: suppliers.length > 0 ? suppliers[0].name : '',
           price: '',
           date: getTodayDate(),
           source: '',
-          comment: '',
         });
       }
       setErrors({});
@@ -122,15 +138,19 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
     if (chosen) {
       setFormData({
         partName: chosen.partName,
+        code: chosen.code || '',
+        specialMark: chosen.specialMark || '',
+        carPosition: chosen.carPosition || '',
+        country: chosen.country || '',
+        comment: chosen.comment || '',
         brand: chosen.brand,
         supplierName: chosen.supplierName,
         price: String(chosen.price),
         date: getTodayDate(), // yangi yozuv uchun joriy sana qo'yiladi
         source: chosen.source,
-        comment: chosen.comment || '',
       });
       setAutoFilledNotice(
-        `«${chosen.partName} (${chosen.brand})» moy ma'lumotlari avtomatik to'ldirildi. Qo'shishdan oldin narx yoki boshqa maydonlarni tahrirlashingiz mumkin!`
+        `«${chosen.partName} (${chosen.brand})» avto ehtiyot qism ma'lumotlari avtomatik to'ldirildi. Qo'shishdan oldin narx yoki boshqa maydonlarni tahrirlashingiz mumkin!`
       );
       setErrors({});
     }
@@ -142,7 +162,7 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
     const errs: { [key: string]: string } = {};
 
     if (!formData.partName.trim()) {
-      errs.partName = 'Moy nomi kiritilishi shart (majburiy)';
+      errs.partName = 'Avto ehtiyot qismi nomi kiritilishi shart (majburiy)';
     }
     if (!formData.brand.trim()) {
       errs.brand = 'Brend kiritilishi shart (majburiy)';
@@ -161,7 +181,10 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
     if (!formData.source.trim()) {
       errs.source = 'Ma\'lumot manbaasi kiritilishi shart (majburiy)';
     }
-    // Izoh qismi majburiy emas (ixtiyoriy)
+    if (!formData.country.trim()) {
+      errs.country = 'Ishlab chiqarilgan davlati kiritilishi shart (majburiy)';
+    }
+    // Kod, Maxsus belgisi, Mashinada joylashgan joyi va Izoh ixtiyoriy (majburiy emas)
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -210,7 +233,7 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-black uppercase tracking-wider text-black font-heading">
-                {isEditMode ? 'Moy ma\'lumotlarini tahrirlash' : 'Yangi moy qo\'shish'}
+                {isEditMode ? 'Avto ehtiyot qism ma\'lumotlarini tahrirlash' : 'Yangi avto ehtiyot qism qo\'shish'}
               </h2>
               <p className="text-[10px] text-stone-700 font-bold">
                 Barcha maydonlar to'ldirilishi majburiy
@@ -238,7 +261,7 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-3.5 max-h-[80vh] overflow-y-auto">
           
-          {/* Eski qo'shilgan moylardan tezkor tanlash (Avtomatik to'ldirish va tahrirlash imkoniyati) */}
+          {/* Eski qo'shilgan avto ehtiyot qismlardan tezkor tanlash (Avtomatik to'ldirish va tahrirlash imkoniyati) */}
           {existingParts && existingParts.length > 0 && !isEditMode && (
             <div className="p-3 bg-amber-100/90 border-2 border-amber-400 space-y-2.5">
               <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -247,10 +270,10 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
                   className="text-xs font-black uppercase text-amber-950 flex items-center gap-1.5"
                 >
                   <History className="w-4 h-4 text-amber-800" />
-                  <span>Eski moylardan tanlash:</span>
+                  <span>Eski avto ehtiyot qismlardan tanlash:</span>
                 </label>
                 <span className="text-[10px] bg-amber-300 px-2 py-0.5 border border-amber-500 font-black text-black">
-                  {existingParts.length} ta mavjud moy
+                  {existingParts.length} ta mavjud ehtiyot qism
                 </span>
               </div>
 
@@ -262,7 +285,7 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
                   type="text"
                   value={templateSearch}
                   onChange={(e) => setTemplateSearch(e.target.value)}
-                  placeholder="Moy nomi, brendi yoki yetkazib beruvchini qidiring (kamida 3 ta harf)..."
+                  placeholder="Avto ehtiyot qismi nomi, brendi yoki yetkazib beruvchini qidiring (kamida 3 ta harf)..."
                   className="w-full pl-8 pr-8 py-2 text-xs border-2 border-amber-500 bg-white text-black font-bold focus:outline-none focus:ring-2 focus:ring-amber-600 rounded-none placeholder:text-stone-400"
                 />
                 {templateSearch && (
@@ -282,22 +305,22 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
                 <div className="p-2 bg-yellow-200/90 border border-amber-400 text-[11px] font-bold text-amber-950 flex items-center gap-1.5">
                   <Info className="w-3.5 h-3.5 text-amber-800 shrink-0" />
                   <span>
-                    Mos moylarni chiqarish uchun kamida 3 ta harf yozing (hozirda {searchTrimmed.length} ta kiritildi)
+                    Mos ehtiyot qismlarni chiqarish uchun kamida 3 ta harf yozing (hozirda {searchTrimmed.length} ta kiritildi)
                   </span>
                 </div>
               )}
 
-              {/* 3 ta harf yozilganda mos moylar ro'yxati */}
+              {/* 3 ta harf yozilganda mos ehtiyot qismlar ro'yxati */}
               {isSearchActive && (
                 <div className="border-2 border-amber-500 bg-white shadow-md">
                   <div className="bg-amber-200 px-3 py-1.5 border-b border-amber-400 flex items-center justify-between text-[11px] font-black text-black">
-                    <span>Qidiruv natijalari ({filteredExistingParts.length} ta mos moy):</span>
+                    <span>Qidiruv natijalari ({filteredExistingParts.length} ta mos ehtiyot qism):</span>
                     <span className="text-[10px] text-stone-700 italic">Tanlash uchun bosing</span>
                   </div>
 
                   {filteredExistingParts.length === 0 ? (
                     <div className="p-3 text-center text-xs font-bold text-stone-600 bg-yellow-50/50">
-                      «{templateSearch}» bo'yicha hech qanday moy topilmadi
+                      «{templateSearch}» bo'yicha hech qanday avto ehtiyot qism topilmadi
                     </div>
                   ) : (
                     <div className="max-h-48 overflow-y-auto divide-y divide-amber-200">
@@ -353,8 +376,8 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
                 >
                   <option value="">
                     {templateSearch
-                      ? `-- Mos moylardan birini tanlang (${filteredExistingParts.length} ta) --`
-                      : `-- Barcha eski moylar ro'yxatidan tanlang (${existingParts.length} ta) --`}
+                      ? `-- Mos avto ehtiyot qismlardan birini tanlang (${filteredExistingParts.length} ta) --`
+                      : `-- Barcha eski avto ehtiyot qismlar ro'yxatidan tanlang (${existingParts.length} ta) --`}
                   </option>
                   {filteredExistingParts.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -393,16 +416,16 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
             </div>
           </div>
 
-          {/* 3. Moy nomi */}
+          {/* 3. Avto ehtiyot qismi nomi */}
           <div>
             <label className="text-xs font-black uppercase tracking-wider text-black block mb-1">
-              3. Moy nomi <span className="text-rose-600">*</span>
+              3. Avto ehtiyot qismi nomi <span className="text-rose-600">*</span>
             </label>
             <input
               type="text"
               value={formData.partName}
               onChange={(e) => setFormData({ ...formData, partName: e.target.value })}
-              placeholder="Masalan: Mannol 5W-30, Shell Helix Ultra 5W-40, ZIC X7 10W-40, Castrol Edge, Total Quartz..."
+              placeholder="Masalan: Tormoz kolodkasi, Amortizator, Moy filtri, Svecha, Radiator, Pompa..."
               className={`w-full px-3 py-2 text-xs border-2 bg-white text-black font-bold focus:outline-none rounded-none ${
                 errors.partName ? 'border-rose-600 bg-rose-50' : 'border-amber-400 focus:border-amber-600'
               }`}
@@ -414,10 +437,86 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
             )}
           </div>
 
-          {/* 4. Brend */}
+          {/* 3-dan so'ng: Kod (ixtiyoriy) va Maxsus belgisi (ixtiyoriy) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-black uppercase tracking-wider text-black block mb-1">
+                Kod <span className="text-stone-500 text-[10px] font-semibold lowercase">(ixtiyoriy)</span>
+              </label>
+              <input
+                type="text"
+                value={formData.code}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                placeholder="Masalan: 96535431, OEM-1249, K-802 (ixtiyoriy)"
+                className="w-full px-3 py-2 text-xs border-2 border-amber-400 focus:border-amber-600 bg-white text-black font-bold focus:outline-none rounded-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-black uppercase tracking-wider text-black block mb-1">
+                Maxsus belgisi <span className="text-stone-500 text-[10px] font-semibold lowercase">(ixtiyoriy)</span>
+              </label>
+              <input
+                type="text"
+                value={formData.specialMark}
+                onChange={(e) => setFormData({ ...formData, specialMark: e.target.value })}
+                placeholder="Masalan: ABS, R14, Gaz-moyli, Standart (ixtiyoriy)"
+                className="w-full px-3 py-2 text-xs border-2 border-amber-400 focus:border-amber-600 bg-white text-black font-bold focus:outline-none rounded-none"
+              />
+            </div>
+          </div>
+
+          {/* Mashinada joylashgan joyi (ixtiyoriy) va Ishlab chiqarilgan davlati (majburiy) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-black uppercase tracking-wider text-black block mb-1">
+                Mashinada joylashgan joyi <span className="text-stone-500 text-[10px] font-semibold lowercase">(ixtiyoriy)</span>
+              </label>
+              <input
+                type="text"
+                value={formData.carPosition}
+                onChange={(e) => setFormData({ ...formData, carPosition: e.target.value })}
+                placeholder="Masalan: Oldi o'ng, Orqa, Motor bo'limi, Salon..."
+                className="w-full px-3 py-2 text-xs border-2 border-amber-400 focus:border-amber-600 bg-white text-black font-bold focus:outline-none rounded-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-black uppercase tracking-wider text-black block mb-1">
+                Ishlab chiqarilgan davlati <span className="text-rose-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.country}
+                onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                placeholder="Masalan: Koreya, O'zbekiston, Germaniya, Xitoy, Yaponiya..."
+                className={`w-full px-3 py-2 text-xs border-2 bg-white text-black font-bold focus:outline-none rounded-none ${
+                  errors.country ? 'border-rose-600 bg-rose-50' : 'border-amber-400 focus:border-amber-600'
+                }`}
+              />
+              {errors.country && (
+                <p className="mt-1 text-[11px] font-bold text-rose-600 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" /> {errors.country}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Nomsiz izoh (ixtiyoriy, labelsiz) */}
+          <div>
+            <textarea
+              rows={2}
+              value={formData.comment}
+              onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
+              placeholder="Izoh (ixtiyoriy)..."
+              className="w-full px-3 py-2 text-xs border-2 border-amber-400 focus:border-amber-600 bg-white text-black font-bold focus:outline-none rounded-none resize-none"
+            />
+          </div>
+
+          {/* Brend */}
           <div>
             <label className="text-xs font-black uppercase tracking-wider text-black block mb-1">
-              4. Brend <span className="text-rose-600">*</span>
+              Brend <span className="text-rose-600">*</span>
             </label>
             <input
               type="text"
@@ -435,10 +534,10 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
             )}
           </div>
 
-          {/* 5. Yetkazib beruvchi (Faqat yetkazib beruvchilar ro'yxatidan ismi bo'yicha tanlanadi) */}
+          {/* Yetkazib beruvchi (Faqat yetkazib beruvchilar ro'yxatidan ismi bo'yicha tanlanadi) */}
           <div>
             <label className="text-xs font-black uppercase tracking-wider text-black block mb-1">
-              5. Yetkazib beruvchi <span className="text-rose-600">*</span>
+              Yetkazib beruvchi <span className="text-rose-600">*</span>
             </label>
             {suppliers.length === 0 ? (
               <div className="p-2.5 bg-yellow-100 border-2 border-amber-400 text-xs font-bold text-stone-800">
@@ -467,11 +566,11 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
             )}
           </div>
 
-          {/* 6. Narx va 7. Sana */}
+          {/* Narx va Sana */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-black uppercase tracking-wider text-black block mb-1">
-                6. Narx ($ / AQSH dollari) <span className="text-rose-600">*</span>
+                Narx ($ / AQSH dollari) <span className="text-rose-600">*</span>
               </label>
               <input
                 type="number"
@@ -498,7 +597,7 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
 
             <div>
               <label className="text-xs font-black uppercase tracking-wider text-black block mb-1">
-                7. Sana <span className="text-rose-600">*</span>
+                Sana <span className="text-rose-600">*</span>
               </label>
               <input
                 type="date"
@@ -516,10 +615,10 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
             </div>
           </div>
 
-          {/* 8. Ma'lumot manbaasi */}
+          {/* Ma'lumot manbaasi */}
           <div>
             <label className="text-xs font-black uppercase tracking-wider text-black block mb-1">
-              8. Ma'lumot manbaasi <span className="text-rose-600">*</span>
+              Ma'lumot manbaasi <span className="text-rose-600">*</span>
             </label>
             <input
               type="text"
@@ -535,22 +634,6 @@ export const AddAutoPartModal: React.FC<AddAutoPartModalProps> = ({
                 <AlertCircle className="w-3 h-3" /> {errors.source}
               </p>
             )}
-          </div>
-
-          {/* 9. Izoh (Ixtiyoriy) */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-black uppercase tracking-wider text-black block">
-                9. Izoh <span className="text-stone-600 text-[10px] font-semibold lowercase">(ixtiyoriy, majburiy emas)</span>
-              </label>
-            </div>
-            <textarea
-              rows={2}
-              value={formData.comment}
-              onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
-              placeholder="Mahsulot holati, sifati, avtomobil modeli (Cobalt, Gentra, Nexia), kafolat va boshqa eslatmalar (ixtiyoriy)..."
-              className="w-full px-3 py-2 text-xs border-2 border-amber-400 focus:border-amber-600 bg-white text-black font-bold focus:outline-none rounded-none resize-none"
-            />
           </div>
 
           {/* Footer Actions */}
