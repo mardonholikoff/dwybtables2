@@ -15,6 +15,7 @@ import {
   deleteSupplierFromDb,
   saveAutoPartToDb,
   deleteAutoPartFromDb,
+  bulkUpdateAutoPartsToDb,
   getCachedSuppliers,
   getCachedAutoParts,
 } from './lib/firestoreService';
@@ -147,6 +148,21 @@ export default function App() {
     }
   };
 
+  // 2-Jadval: Tahrirlangan jadvalni ommaviy saqlash (Firebase batch update)
+  const handleBulkUpdateAutoParts = async (updatedParts: AutoPart[]) => {
+    if (!isOnline) {
+      alert('Oflayn rejimda o\'zgartirishlarni saqlash imkoniyati cheklangan!');
+      return;
+    }
+
+    try {
+      await bulkUpdateAutoPartsToDb(updatedParts);
+    } catch (err: any) {
+      alert(err?.message || 'O\'zgartirishlarni saqlashda xatolik yuz berdi');
+      throw err;
+    }
+  };
+
   // Mavjud barcha yetkazib beruvchilardagi unikal mahsulotlar (1-jadval uchun)
   const allAvailableProducts = useMemo(() => {
     const set = new Set<string>();
@@ -210,6 +226,7 @@ export default function App() {
               setIsAddAutoPartOpen(true);
             }}
             onDeletePart={handleDeleteAutoPart}
+            onBulkUpdateParts={handleBulkUpdateAutoParts}
           />
         )}
 

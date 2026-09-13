@@ -3,6 +3,7 @@ import {
   Wrench,
   Plus,
   FileSpreadsheet,
+  FileEdit,
   Edit2,
   Trash2,
   Calendar,
@@ -22,16 +23,19 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { AutoPart } from '../types';
-import { exportAutoPartsToExcel } from '../utils/excelExport';
+import { exportAutoPartsToExcel, exportAutoPartsForEditing } from '../utils/excelExport';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { formatUSD } from '../utils/formatCurrency';
 import { MultiSelectPickFilter } from './MultiSelectPickFilter';
+import { AutoPartsExcelWarningModal } from './AutoPartsExcelWarningModal';
+import { AutoPartsExcelUploadSection } from './AutoPartsExcelUploadSection';
 
 interface AutoPartsTableProps {
   parts: AutoPart[];
   onOpenAddModal: () => void;
   onEditPart: (part: AutoPart) => void;
   onDeletePart: (id: string) => void;
+  onBulkUpdateParts: (updatedParts: AutoPart[]) => Promise<void>;
 }
 
 export const AutoPartsTable: React.FC<AutoPartsTableProps> = ({
@@ -39,9 +43,11 @@ export const AutoPartsTable: React.FC<AutoPartsTableProps> = ({
   onOpenAddModal,
   onEditPart,
   onDeletePart,
+  onBulkUpdateParts,
 }) => {
   const isOnline = useOnlineStatus();
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [isWarningModalOpen, setIsWarningModalOpen] = useState(false);
   
   // Mobilda ko'rinish rejimi: 'cards' (ixcham kartalar) yoki 'table' (gorizontal suriladigan jadval)
   const [mobileViewMode, setMobileViewMode] = useState<'cards' | 'table'>('cards');
@@ -438,6 +444,17 @@ export const AutoPartsTable: React.FC<AutoPartsTableProps> = ({
 
         {/* Buttons: Add & Excel Export */}
         <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+          {/* Jadvalni yuklab tahrirlash (ogohlantirish bilan) */}
+          <button
+            type="button"
+            onClick={() => setIsWarningModalOpen(true)}
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 bg-amber-300 hover:bg-amber-400 border-2 border-amber-600 text-black text-xs font-black transition cursor-pointer active:scale-95 shadow-2xs rounded-none"
+            title="Jadvalni qora ramkalar bilan tahrirlash uchun Excel (.xlsx) formatida yuklab olish"
+          >
+            <FileEdit className="w-4 h-4 text-black stroke-[2.5]" />
+            <span>Jadvalni yuklab tahrirlash</span>
+          </button>
+
           {/* Excel Export */}
           <button
             type="button"
@@ -1226,6 +1243,21 @@ export const AutoPartsTable: React.FC<AutoPartsTableProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Tahrirlangan jadvalni yuklash bo'limi (pastda) */}
+      <AutoPartsExcelUploadSection
+        parts={parts}
+        isOnline={isOnline}
+        onBulkUpdateParts={onBulkUpdateParts}
+      />
+
+      {/* Jadvalni yuklab tahrirlash ogohlantirish modali */}
+      <AutoPartsExcelWarningModal
+        isOpen={isWarningModalOpen}
+        onClose={() => setIsWarningModalOpen(false)}
+        onConfirmDownload={() => exportAutoPartsForEditing(parts)}
+        rowCount={parts.length}
+      />
 
       {/* Delete Confirmation Modal */}
       {deleteTargetId && (

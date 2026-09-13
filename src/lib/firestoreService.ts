@@ -3,6 +3,7 @@ import {
   doc,
   setDoc,
   deleteDoc,
+  writeBatch,
   onSnapshot,
   query,
   orderBy,
@@ -310,3 +311,36 @@ export async function deleteAutoPartFromDb(id: string): Promise<void> {
   }
   await deleteDoc(doc(db, AUTOPARTS_COLLECTION, id));
 }
+
+// Bulk update Auto Parts (e.g., from edited Excel table)
+export async function bulkUpdateAutoPartsToDb(updatedParts: AutoPart[]): Promise<void> {
+  if (!navigator.onLine) {
+    throw new Error('Oflayn rejimda o\'zgartirishlarni bazaga saqlash imkoniyati cheklangan!');
+  }
+
+  if (!updatedParts || updatedParts.length === 0) {
+    return;
+  }
+
+  // Firestore allows up to 500 operations per batch
+  const batchSize = 400;
+  for (let i = 0; i < updatedParts.length; i += batchSize) {
+    const chunk = updatedParts.slice(i, i + batchSize);
+    const batch = writeBatch(db);
+    for (const part of chunk) {
+      const docRef = doc(db, AUTOPARTS_COLLECTION, part.id);
+      const payload = cleanForFirestore(part);
+      batch.set(docRef, payload, { merge: true });
+    }
+    await batch.commit();
+  }
+
+  // Update local cache
+  const cached = getCachedAutoParts();
+  const map = new Map<string, AutoPart>();
+  cached.forEach((p) => map.set(p.id, p));
+  updatedParts.forEach((p) => map.set(p.id, p));
+  const merged = Array.from(map.values()).sort((a, b) => (a.orderNumber || 0) - (b.orderNumber || 0));
+  localStorage.setItem(AUTOPARTS_CACHE_KEY, JSON.stringify(merged));
+}
+
