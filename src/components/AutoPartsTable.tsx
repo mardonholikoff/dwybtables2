@@ -1,9 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Wrench,
   Plus,
   FileSpreadsheet,
-  FileEdit,
   Edit2,
   Trash2,
   Calendar,
@@ -21,17 +20,23 @@ import {
   Globe,
   ChevronDown,
   ChevronUp,
+  Download,
+  Upload,
+  CheckCircle2,
 } from 'lucide-react';
-import { AutoPart } from '../types';
+import { AutoPart, Supplier } from '../types';
 import { exportAutoPartsToExcel, exportAutoPartsForEditing } from '../utils/excelExport';
+import { parseAndValidateEditedAutoParts, RowDiff } from '../utils/excelImport';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { formatUSD } from '../utils/formatCurrency';
 import { MultiSelectPickFilter } from './MultiSelectPickFilter';
 import { AutoPartsExcelWarningModal } from './AutoPartsExcelWarningModal';
 import { AutoPartsExcelUploadSection } from './AutoPartsExcelUploadSection';
+import { AutoPartsExcelImportDiffModal } from './AutoPartsExcelImportDiffModal';
 
 interface AutoPartsTableProps {
   parts: AutoPart[];
+  suppliers?: Supplier[];
   onOpenAddModal: () => void;
   onEditPart: (part: AutoPart) => void;
   onDeletePart: (id: string) => void;
@@ -40,6 +45,7 @@ interface AutoPartsTableProps {
 
 export const AutoPartsTable: React.FC<AutoPartsTableProps> = ({
   parts,
+  suppliers = [],
   onOpenAddModal,
   onEditPart,
   onDeletePart,
@@ -48,6 +54,85 @@ export const AutoPartsTable: React.FC<AutoPartsTableProps> = ({
   const isOnline = useOnlineStatus();
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [isWarningModalOpen, setIsWarningModalOpen] = useState(false);
+  
+  // Tahrirlangan jadvalni yuklash uchun holatlar (barcha tekshiruvlar va bazaga qo'shish)
+  const topFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [uploadSuccessToast, setUploadSuccessToast] = useState<string | null>(null);
+  const [isDiffModalOpen, setIsDiffModalOpen] = useState(false);
+  const [diffs, setDiffs] = useState<RowDiff[]>([]);
+  const [pendingUpdatedParts, setPendingUpdatedParts] = useState<AutoPart[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Excel faylni qabul qilish va barcha qat'iy tekshiruvlardan o'tkazish
+  const handleTopFileProcess = async (file: File) => {
+    setValidationError(null);
+    setUploadSuccessToast(null);
+
+    if (!file) return;
+
+    if (!file.name.match(/\.(xlsx|xls)$/i)) {
+      setValidationError("Faqat Excel (.xlsx yoki .xls) formatidagi fayllar qabul qilinadi!");
+      return;
+    }
+
+    try {
+      const buffer = await file.arrayBuffer();
+      // BARCHA TEKSHIRUVLAR:
+      // 1. Ustunlar soni va nomlari to'liq mosligi
+      // 2. Majburiy maydonlar to'ldirilganligi (Qism nomi, Brend, Yetkazib beruvchi, Narx, Sana, Ishlab chiqarilgan davlati, Ma'lumot manbaasi)
+      // 3. Yetkazib beruvchi 1-jadvaldagi mavjud yetkazib beruvchilardan biri bo'lishi shartligi
+      // 4. Narx va sana formatlari
+      const result = parseAndValidateEditedAutoParts(buffer, parts, suppliers);
+
+      if (!result.success) {
+        setValidationError(result.error || "Faylni tekshirishda xatolik yuz berdi.");
+        return;
+      }
+
+      if (result.diffs && result.diffs.length === 0) {
+        setUploadSuccessToast("Fayl tekshirildi: Barcha ma'lumotlar to'liq mos, ammo yangi o'zgarishlar kiritilmagan.");
+        return;
+      }
+
+      setDiffs(result.diffs || []);
+      setPendingUpdatedParts(result.updatedParts || []);
+      setIsDiffModalOpen(true);
+    } catch (err: any) {
+      setValidationError(err?.message || "Faylni o'qishda kutilmagan xatolik yuz berdi.");
+    } finally {
+      if (topFileInputRef.current) {
+        topFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleTopFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleTopFileProcess(file);
+    }
+  };
+
+  const handleConfirmSaveDiffs = async () => {
+    if (!isOnline) {
+      alert("Oflayn rejimda o'zgartirishlarni saqlash imkoniyati cheklangan!");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await onBulkUpdateParts(pendingUpdatedParts);
+      setIsDiffModalOpen(false);
+      setUploadSuccessToast(`Muvaffaqiyatli saqlandi! Jadvaldagi ${diffs.length} ta yozuv bazaga qabul qilindi va Firebase bazasiga saqlandi.`);
+      setDiffs([]);
+      setPendingUpdatedParts([]);
+    } catch (err: any) {
+      setValidationError(err?.message || "Bazaga saqlashda xatolik yuz berdi.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
   
   // Mobilda ko'rinish rejimi: 'cards' (ixcham kartalar) yoki 'table' (gorizontal suriladigan jadval)
   const [mobileViewMode, setMobileViewMode] = useState<'cards' | 'table'>('cards');
@@ -442,24 +527,55 @@ export const AutoPartsTable: React.FC<AutoPartsTableProps> = ({
           </div>
         </div>
 
+        {/* Hidden file input for "Tahrirlangan jadvalni yuklash" button */}
+        <input
+          ref={topFileInputRef}
+          type="file"
+          accept=".xlsx, .xls"
+          className="hidden"
+          onChange={handleTopFileInputChange}
+        />
+
         {/* Buttons: Add & Excel Export */}
         <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-          {/* Jadvalni yuklab tahrirlash (ogohlantirish bilan) */}
+          {/* Tahrirlangan jadvalni yuklash tugmasi (barcha tekshiruvlardan o'tib bazaga qo'shiladi) */}
+          <button
+            type="button"
+            onClick={() => {
+              if (!isOnline) {
+                alert("Oflayn rejimda fayl yuklab bo'lmaydi!");
+                return;
+              }
+              topFileInputRef.current?.click();
+            }}
+            disabled={!isOnline}
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 border-2 text-xs font-black transition cursor-pointer active:scale-95 shadow-2xs rounded-none ${
+              !isOnline
+                ? 'bg-stone-200 border-stone-400 text-stone-500 cursor-not-allowed'
+                : 'bg-emerald-400 hover:bg-emerald-500 border-emerald-700 text-emerald-950'
+            }`}
+            title="Tahrirlangan Excel jadvalini yuklash (barcha qat'iy tekshiruvlardan o'tkazilib, bazaga qo'shiladi)"
+          >
+            <Upload className="w-4 h-4 text-emerald-950 stroke-[2.5]" />
+            <span>Tahrirlangan jadvalni yuklash</span>
+          </button>
+
+          {/* Jadvalni yuklab tahrirlash (Excel fayl yuklab olish ogohlantirish bilan) */}
           <button
             type="button"
             onClick={() => setIsWarningModalOpen(true)}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 bg-amber-300 hover:bg-amber-400 border-2 border-amber-600 text-black text-xs font-black transition cursor-pointer active:scale-95 shadow-2xs rounded-none"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 bg-amber-200 hover:bg-amber-300 border-2 border-amber-500 text-black text-xs font-black transition cursor-pointer active:scale-95 shadow-2xs rounded-none"
             title="Jadvalni qora ramkalar bilan tahrirlash uchun Excel (.xlsx) formatida yuklab olish"
           >
-            <FileEdit className="w-4 h-4 text-black stroke-[2.5]" />
-            <span>Jadvalni yuklab tahrirlash</span>
+            <Download className="w-4 h-4 text-black stroke-[2.5]" />
+            <span>Excel yuklab tahrirlash</span>
           </button>
 
           {/* Excel Export */}
           <button
             type="button"
             onClick={handleExport}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 bg-amber-200 hover:bg-amber-300 border-2 border-amber-500 text-black text-xs font-black transition cursor-pointer active:scale-95 shadow-2xs rounded-none"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 bg-white hover:bg-yellow-100 border-2 border-amber-400 text-black text-xs font-black transition cursor-pointer active:scale-95 shadow-2xs rounded-none"
             title="Avto ehtiyot qismlar jadvalini Excel (.xlsx) formatida yuklab olish"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-800 stroke-[2.5]" />
@@ -1247,6 +1363,7 @@ export const AutoPartsTable: React.FC<AutoPartsTableProps> = ({
       {/* Tahrirlangan jadvalni yuklash bo'limi (pastda) */}
       <AutoPartsExcelUploadSection
         parts={parts}
+        suppliers={suppliers}
         isOnline={isOnline}
         onBulkUpdateParts={onBulkUpdateParts}
       />
@@ -1255,9 +1372,79 @@ export const AutoPartsTable: React.FC<AutoPartsTableProps> = ({
       <AutoPartsExcelWarningModal
         isOpen={isWarningModalOpen}
         onClose={() => setIsWarningModalOpen(false)}
-        onConfirmDownload={() => exportAutoPartsForEditing(parts)}
+        onConfirmDownload={(newRowsCount) => exportAutoPartsForEditing(parts, suppliers, newRowsCount)}
         rowCount={parts.length}
       />
+
+      {/* Tahrirlangan jadval tekshiruvi va bazaga saqlash diff modali */}
+      <AutoPartsExcelImportDiffModal
+        isOpen={isDiffModalOpen}
+        onClose={() => setIsDiffModalOpen(false)}
+        diffs={diffs}
+        totalRows={parts.length}
+        onConfirmSave={handleConfirmSaveDiffs}
+        isSaving={isSaving}
+      />
+
+      {/* Tekshiruvdan o'tmagan holat uchun ogohlantirish modali */}
+      {validationError && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-amber-50 border-3 border-rose-500 max-w-lg w-full shadow-2xl text-black">
+            <div className="p-3 bg-rose-600 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-white stroke-[2.5]" />
+                <h3 className="font-black text-sm uppercase">Tekshiruv xatoligi: Jadval qabul qilinmadi</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setValidationError(null)}
+                className="p-1 hover:bg-rose-700 text-white cursor-pointer font-bold"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="p-3 bg-rose-100 border border-rose-300 text-rose-950 font-bold text-xs space-y-1">
+                <p className="font-black text-[13px] text-rose-900">Yuklash rad etildi:</p>
+                <p className="whitespace-pre-wrap">{validationError}</p>
+              </div>
+              <p className="text-[11px] font-semibold text-stone-700">
+                Baza yaxlitligi va to'g'riligini saqlash maqsadida barcha tekshiruvlardan to'liq o'tmaguncha jadval bazaga saqlanmaydi.
+                Iltimos, ko'rsatilgan qator yoki ustundagi ma'lumotni to'g'rilab, faylni qayta yuklang.
+              </p>
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setValidationError(null)}
+                  className="px-4 py-2 bg-stone-900 hover:bg-black text-white text-xs font-black cursor-pointer shadow-xs"
+                >
+                  Tushundim, to'g'rilayman
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Muvaffaqiyatli saqlanganlik bildirishnomasi */}
+      {uploadSuccessToast && (
+        <div className="fixed bottom-5 right-5 z-50 max-w-md bg-emerald-600 text-white border-2 border-emerald-800 p-4 shadow-2xl flex items-start justify-between gap-3 animate-in fade-in slide-in-from-bottom-5">
+          <div className="flex items-start gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-white shrink-0 mt-0.5" />
+            <div>
+              <p className="font-black text-xs uppercase tracking-wider">Muvaffaqiyatli saqlandi</p>
+              <p className="text-xs font-bold mt-0.5">{uploadSuccessToast}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setUploadSuccessToast(null)}
+            className="text-white hover:text-emerald-200 font-bold text-sm px-1 cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteTargetId && (

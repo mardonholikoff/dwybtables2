@@ -1,17 +1,19 @@
 import React, { useRef, useState } from 'react';
 import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle, WifiOff, FileCheck2 } from 'lucide-react';
-import { AutoPart } from '../types';
+import { AutoPart, Supplier } from '../types';
 import { parseAndValidateEditedAutoParts, RowDiff } from '../utils/excelImport';
 import { AutoPartsExcelImportDiffModal } from './AutoPartsExcelImportDiffModal';
 
 interface AutoPartsExcelUploadSectionProps {
   parts: AutoPart[];
+  suppliers?: Supplier[];
   isOnline: boolean;
   onBulkUpdateParts: (updatedParts: AutoPart[]) => Promise<void>;
 }
 
 export const AutoPartsExcelUploadSection: React.FC<AutoPartsExcelUploadSectionProps> = ({
   parts,
+  suppliers = [],
   isOnline,
   onBulkUpdateParts,
 }) => {
@@ -37,7 +39,7 @@ export const AutoPartsExcelUploadSection: React.FC<AutoPartsExcelUploadSectionPr
 
     try {
       const buffer = await file.arrayBuffer();
-      const result = parseAndValidateEditedAutoParts(buffer, parts);
+      const result = parseAndValidateEditedAutoParts(buffer, parts, suppliers);
 
       if (!result.success) {
         setErrorMessage(result.error || 'Faylni tekshirishda xatolik yuz berdi.');
@@ -98,7 +100,7 @@ export const AutoPartsExcelUploadSection: React.FC<AutoPartsExcelUploadSectionPr
     try {
       await onBulkUpdateParts(pendingUpdatedParts);
       setIsDiffModalOpen(false);
-      setSuccessMessage(`Muvaffaqiyatli saqlandi! Jadvaldagi ${diffs.length} ta yozuv bazada yangilandi.`);
+      setSuccessMessage(`Muvaffaqiyatli saqlandi! Jadvaldagi ${diffs.length} ta yozuv bazada yangilandi va yangi qatorlar qo'shildi.`);
       setDiffs([]);
       setPendingUpdatedParts([]);
     } catch (err: any) {
@@ -130,7 +132,7 @@ export const AutoPartsExcelUploadSection: React.FC<AutoPartsExcelUploadSectionPr
               Tahrirlangan jadvalni yuklash (Excel import)
             </h3>
             <p className="text-[11px] font-bold text-stone-700">
-              Faqatgina jadvlaga mos qator ({parts.length} ta) va ustunlari bo'lgan faylni qabul qiladi
+              Mavjud qatorlarni tahrirlash yoki yangi qatorlar qo'shilgan faylni tekshirib bazaga qabul qilish
             </p>
           </div>
         </div>
@@ -204,7 +206,7 @@ export const AutoPartsExcelUploadSection: React.FC<AutoPartsExcelUploadSectionPr
               Tahrirlangan Excel (.xlsx) faylini bu yerga tortib olib keling yoki tugmani bosing
             </p>
             <p className="text-[11px] font-semibold text-stone-700">
-              Qatorlar soni aynan <strong>{parts.length} ta</strong> bo'lishi va ustunlar o'zgartirilmagan bo'lishi shart.
+              Yangi qatorlar bo'lsa avtomatik assign qilinadi; Yetkazib beruvchi faqat 1-jadvaldagi mavjudlaridan biri bo'lishi va majburiy maydonlar to'liq bo'lishi shart.
             </p>
           </div>
         </div>

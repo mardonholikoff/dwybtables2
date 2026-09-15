@@ -213,11 +213,27 @@ export function exportAutoPartsToExcel(parts: AutoPart[], fileNamePrefix = 'Daew
 }
 
 // 2-jadvalni tahrirlash uchun maxsus yuklab berish funksiyasi
-// Chiroyli, qora ramkalar bilan chizilgan, to'liq ustunlar va qatorlar bilan .xlsx formatda
-export function exportAutoPartsForEditing(parts: AutoPart[], fileNamePrefix = 'Daewoo_2-Jadval_Tahrirlash_Uchun') {
+// Chiroyli, qora ramkalar bilan chizilgan, to'liq ustunlar va foydalanuvchi tanlagan yangi qatorlar bilan .xlsx formatda
+export function exportAutoPartsForEditing(
+  parts: AutoPart[],
+  suppliers: Supplier[] = [],
+  newRowsCount = 5,
+  fileNamePrefix = 'Daewoo_2-Jadval_Tahrirlash_Uchun'
+) {
   const headers = [...AUTO_PARTS_EXCEL_HEADERS];
   const rows: any[][] = [headers];
 
+  const now = new Date();
+  const currentSystemTime = now.toLocaleString('uz-UZ', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+
+  // 1. Mavjud qatorlar
   parts.forEach((item, idx) => {
     rows.push([
       item.orderNumber || idx + 1,
@@ -237,6 +253,33 @@ export function exportAutoPartsForEditing(parts: AutoPart[], fileNamePrefix = 'D
     ]);
   });
 
+  // 2. Foydalanuvchi tanlagan yangi qatorlar soni bo'yicha tayyor qora ramkali shablon qatorlar
+  // Bunda tizim ID, tartib raqam, sistema vaqti avtomatik berilgan, celllar formati tepadagilar bilan bir xil
+  const EXTRA_BLANK_ROWS = Math.max(0, newRowsCount);
+  const startOrder = parts.length > 0
+    ? Math.max(...parts.map((p) => p.orderNumber || 0)) + 1
+    : 1;
+
+  for (let i = 0; i < EXTRA_BLANK_ROWS; i++) {
+    const nextOrder = startOrder + i;
+    rows.push([
+      nextOrder, // Tartib raqam avtomatik
+      currentSystemTime, // Sistema vaqti avtomatik
+      '', // Qism nomi (to'ldirish kerak)
+      '', // Kod
+      '', // Maxsus belgisi
+      '', // Mashinadagi joyi
+      '', // Ishlab chiqarilgan davlati
+      '', // Brend (to'ldirish kerak)
+      '', // Yetkazib beruvchi (1-jadvaldagi mavjudlaridan biri bo'lishi shart!)
+      '', // Narx (to'ldirish kerak)
+      '', // Sana (to'ldirish kerak)
+      '', // Ma'lumot manbaasi
+      '', // Izoh
+      '', // ID bo'sh (yuklanganda tizim o'zi unikal ID beradi)
+    ]);
+  }
+
   const worksheet = XLSX.utils.aoa_to_sheet(rows);
 
   // Ustunlar kengligi
@@ -254,13 +297,13 @@ export function exportAutoPartsForEditing(parts: AutoPart[], fileNamePrefix = 'D
     { wch: 16 }, // Sana
     { wch: 22 }, // Ma'lumot manbaasi
     { wch: 35 }, // Izoh
-    { wch: 26 }, // ID (Tizim kodi - o'zgartirilmasin)
+    { wch: 26 }, // ID (Tizim kodi - yangi qatorlarda bo'sh qoldirilishi mumkin)
   ];
 
   // Qatorlar balandligi
   worksheet['!rows'] = [
     { hpt: 26 }, // sarlavha qatori balandroq
-    ...parts.map(() => ({ hpt: 20 })),
+    ...rows.slice(1).map(() => ({ hpt: 20 })),
   ];
 
   // Har bir katakka qora chizilgan ramkalarni qo'llash
@@ -268,6 +311,30 @@ export function exportAutoPartsForEditing(parts: AutoPart[], fileNamePrefix = 'D
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, '2-Jadval Ehtiyot qismlar');
+
+  // 3. Mavjud yetkazib beruvchilar ma'lumotnomasi varag'i (foydalanuvchi faqat mavjudlarini tanlashi uchun)
+  if (suppliers && suppliers.length > 0) {
+    const supplierRows: any[][] = [
+      ['№', 'Mavjud yetkazib beruvchi nomi (1-jadvaldan)', 'Faoliyat turi', 'Telefon'],
+    ];
+    suppliers.forEach((sup, idx) => {
+      supplierRows.push([
+        idx + 1,
+        sup.name,
+        Array.isArray(sup.activityTypes) ? sup.activityTypes.join(', ') : sup.activityType || '',
+        sup.phone || '',
+      ]);
+    });
+    const supSheet = XLSX.utils.aoa_to_sheet(supplierRows);
+    supSheet['!cols'] = [
+      { wch: 6 },
+      { wch: 32 },
+      { wch: 24 },
+      { wch: 18 },
+    ];
+    applyBlackBordersToSheet(supSheet, supplierRows.length, 4, [0, 2, 3], []);
+    XLSX.utils.book_append_sheet(workbook, supSheet, 'Mavjud Yetkazib Beruvchilar');
+  }
 
   const dateStr = new Date().toISOString().split('T')[0];
   const fullFileName = `${fileNamePrefix}_${dateStr}.xlsx`;

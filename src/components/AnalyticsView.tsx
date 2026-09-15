@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   TrendingUp,
   Calendar,
@@ -71,14 +71,21 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
   // - Brendlar
   // - Kodlar
   // - Maxsus belgilar
-  // - Mashinadagi joylar
-  // - Ishlab chiqarilgan davlatlar
+  // 2. Ko'p tanlovli (multi-select) filtr holatlari:
+  // - Ehtiyot qism turlari (MAJBURIIY)
+  // - Brendlar (IXTIYORIY)
+  // - Kodlar (Qism nomiga bog'liq)
+  // - Maxsus belgilar (Qism nomiga bog'liq)
+  // - Mashinadagi joylar (Qism nomiga bog'liq)
+  // - Ishlab chiqarilgan davlatlar (Qism nomiga bog'liq)
+  // - Yetkazib beruvchilar (Qism nomiga bog'liq)
   const [filterPartNames, setFilterPartNames] = useState<string[]>([]);
   const [filterBrands, setFilterBrands] = useState<string[]>([]);
   const [filterCodes, setFilterCodes] = useState<string[]>([]);
   const [filterSpecialMarks, setFilterSpecialMarks] = useState<string[]>([]);
   const [filterCarPositions, setFilterCarPositions] = useState<string[]>([]);
   const [filterCountries, setFilterCountries] = useState<string[]>([]);
+  const [filterSuppliers, setFilterSuppliers] = useState<string[]>([]);
 
   // Filtrlar paneli ochilgan/yopilganligi
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(true);
@@ -103,11 +110,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
   // MAVJUD CELLAR ICHIDAGI MA'LUMOTLAR BO'YICHA UNIKAL RO'YXATLAR VA HISOB-KITOBLAR
   // =========================================================================
 
-  // 1. Unikal qism nomlari va ularning soni
+  // 1. Unikal qism nomlari va ularning soni (HAMMA QISMLARDAN, MAJBURIIY)
   const { uniquePartNames, partNameCounts } = useMemo(() => {
     const counts: Record<string, number> = {};
     parts.forEach((p) => {
-      const val = p.partName?.trim();
+      const val = (p.partName || '').trim();
       if (val) counts[val] = (counts[val] || 0) + 1;
     });
     return {
@@ -116,11 +123,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
     };
   }, [parts]);
 
-  // 2. Unikal brendlar va ularning soni
+  // 2. Unikal brendlar va ularning soni (IXTIYORIY VA DOIM OCHIQ)
   const { uniqueBrands, brandCounts } = useMemo(() => {
     const counts: Record<string, number> = {};
     parts.forEach((p) => {
-      const val = p.brand?.trim();
+      const val = (p.brand || '').trim();
       if (val) counts[val] = (counts[val] || 0) + 1;
     });
     return {
@@ -129,57 +136,140 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
     };
   }, [parts]);
 
-  // 3. Unikal kodlar va ularning soni
+  // Qism nomlari tanlanganda faqat o'sha tanlangan qismlarga tegishli yozuvlar
+  const partsMatchingSelectedPartNames = useMemo(() => {
+    if (filterPartNames.length === 0) return [];
+    return parts.filter((p) => filterPartNames.includes((p.partName || '').trim()));
+  }, [parts, filterPartNames]);
+
+  // 3. Unikal kodlar va ularning soni (Faqat tanlangan qism(lar)ga mos, bo'sh qiymatlar bilan birga)
   const { uniqueCodes, codeCounts } = useMemo(() => {
     const counts: Record<string, number> = {};
-    parts.forEach((p) => {
-      const val = p.code?.trim();
-      if (val) counts[val] = (counts[val] || 0) + 1;
+    if (partsMatchingSelectedPartNames.length === 0) {
+      return { uniqueCodes: [], codeCounts: {} };
+    }
+    partsMatchingSelectedPartNames.forEach((p) => {
+      const val = (p.code || '').trim();
+      counts[val] = (counts[val] || 0) + 1;
+    });
+    const sorted = Object.keys(counts).sort((a, b) => {
+      if (a === '') return 1;
+      if (b === '') return -1;
+      return a.localeCompare(b, 'uz');
     });
     return {
-      uniqueCodes: Object.keys(counts).sort((a, b) => a.localeCompare(b, 'uz')),
+      uniqueCodes: sorted,
       codeCounts: counts,
     };
-  }, [parts]);
+  }, [partsMatchingSelectedPartNames]);
 
-  // 4. Unikal maxsus belgilar va ularning soni
+  // 4. Unikal maxsus belgilar va ularning soni (Faqat tanlangan qism(lar)ga mos)
   const { uniqueSpecialMarks, specialMarkCounts } = useMemo(() => {
     const counts: Record<string, number> = {};
-    parts.forEach((p) => {
-      const val = p.specialMark?.trim();
-      if (val) counts[val] = (counts[val] || 0) + 1;
+    if (partsMatchingSelectedPartNames.length === 0) {
+      return { uniqueSpecialMarks: [], specialMarkCounts: {} };
+    }
+    partsMatchingSelectedPartNames.forEach((p) => {
+      const val = (p.specialMark || '').trim();
+      counts[val] = (counts[val] || 0) + 1;
+    });
+    const sorted = Object.keys(counts).sort((a, b) => {
+      if (a === '') return 1;
+      if (b === '') return -1;
+      return a.localeCompare(b, 'uz');
     });
     return {
-      uniqueSpecialMarks: Object.keys(counts).sort((a, b) => a.localeCompare(b, 'uz')),
+      uniqueSpecialMarks: sorted,
       specialMarkCounts: counts,
     };
-  }, [parts]);
+  }, [partsMatchingSelectedPartNames]);
 
-  // 5. Unikal mashinadagi joylar va ularning soni
+  // 5. Unikal mashinadagi joylar va ularning soni (Faqat tanlangan qism(lar)ga mos)
   const { uniqueCarPositions, carPositionCounts } = useMemo(() => {
     const counts: Record<string, number> = {};
-    parts.forEach((p) => {
-      const val = p.carPosition?.trim();
-      if (val) counts[val] = (counts[val] || 0) + 1;
+    if (partsMatchingSelectedPartNames.length === 0) {
+      return { uniqueCarPositions: [], carPositionCounts: {} };
+    }
+    partsMatchingSelectedPartNames.forEach((p) => {
+      const val = (p.carPosition || '').trim();
+      counts[val] = (counts[val] || 0) + 1;
+    });
+    const sorted = Object.keys(counts).sort((a, b) => {
+      if (a === '') return 1;
+      if (b === '') return -1;
+      return a.localeCompare(b, 'uz');
     });
     return {
-      uniqueCarPositions: Object.keys(counts).sort((a, b) => a.localeCompare(b, 'uz')),
+      uniqueCarPositions: sorted,
       carPositionCounts: counts,
     };
-  }, [parts]);
+  }, [partsMatchingSelectedPartNames]);
 
-  // 6. Unikal davlatlar va ularning soni
+  // 6. Unikal davlatlar va ularning soni (Faqat tanlangan qism(lar)ga mos)
   const { uniqueCountries, countryCounts } = useMemo(() => {
     const counts: Record<string, number> = {};
-    parts.forEach((p) => {
-      const val = p.country?.trim();
-      if (val) counts[val] = (counts[val] || 0) + 1;
+    if (partsMatchingSelectedPartNames.length === 0) {
+      return { uniqueCountries: [], countryCounts: {} };
+    }
+    partsMatchingSelectedPartNames.forEach((p) => {
+      const val = (p.country || '').trim();
+      counts[val] = (counts[val] || 0) + 1;
+    });
+    const sorted = Object.keys(counts).sort((a, b) => {
+      if (a === '') return 1;
+      if (b === '') return -1;
+      return a.localeCompare(b, 'uz');
     });
     return {
-      uniqueCountries: Object.keys(counts).sort((a, b) => a.localeCompare(b, 'uz')),
+      uniqueCountries: sorted,
       countryCounts: counts,
     };
-  }, [parts]);
+  }, [partsMatchingSelectedPartNames]);
+
+  // 7. Unikal yetkazib beruvchilar va ularning soni (Faqat tanlangan qism(lar)ga mos)
+  const { uniqueSuppliers, supplierCountsInFiltered } = useMemo(() => {
+    const counts: Record<string, number> = {};
+    if (partsMatchingSelectedPartNames.length === 0) {
+      return { uniqueSuppliers: [], supplierCountsInFiltered: {} };
+    }
+    partsMatchingSelectedPartNames.forEach((p) => {
+      const val = (p.supplierName || '').trim();
+      counts[val] = (counts[val] || 0) + 1;
+    });
+    const sorted = Object.keys(counts).sort((a, b) => {
+      if (a === '') return 1;
+      if (b === '') return -1;
+      return a.localeCompare(b, 'uz');
+    });
+    return {
+      uniqueSuppliers: sorted,
+      supplierCountsInFiltered: counts,
+    };
+  }, [partsMatchingSelectedPartNames]);
+
+  // Agar qism nomi o'zgarsa, mos kelmaydigan tanlovlarni avtomatik tozalash
+  useEffect(() => {
+    if (filterPartNames.length === 0) {
+      setFilterCodes([]);
+      setFilterSpecialMarks([]);
+      setFilterCarPositions([]);
+      setFilterCountries([]);
+      setFilterSuppliers([]);
+      return;
+    }
+    setFilterCodes((prev) => prev.filter((val) => uniqueCodes.includes(val)));
+    setFilterSpecialMarks((prev) => prev.filter((val) => uniqueSpecialMarks.includes(val)));
+    setFilterCarPositions((prev) => prev.filter((val) => uniqueCarPositions.includes(val)));
+    setFilterCountries((prev) => prev.filter((val) => uniqueCountries.includes(val)));
+    setFilterSuppliers((prev) => prev.filter((val) => uniqueSuppliers.includes(val)));
+  }, [
+    filterPartNames,
+    uniqueCodes,
+    uniqueSpecialMarks,
+    uniqueCarPositions,
+    uniqueCountries,
+    uniqueSuppliers,
+  ]);
 
   // Sana bo'yicha tezkor filtrlar
   const handleQuickDateFilter = (type: 'all' | '30d' | '3m' | '6m' | 'year') => {
@@ -208,41 +298,62 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
   };
 
   // =========================================================================
-  // 7 TA MEZON ASOSIDA FILTRLASH LOGIKASI
+  // TAHLIL ASOSIY FILTRLASH LOGIKASI
+  // Qism nomi tanlash MAJBURIIY: Agar qism nomi tanlanmagan bo'lsa, ro'yxat bo'sh bo'ladi
+  // Brend va Sana oralig'i IXTIYORIY
+  // Kod, Maxsus belgi, Joy, Davlat va Yetkazib beruvchi esa tanlangan qism(lar)ga bog'liq
+  // Bo'sh qiymatlar ham inobatga olinadi
   // =========================================================================
   const filteredData = useMemo(() => {
+    // Majburiy qism: agar birorta ham qism nomi tanlanmagan bo'lsa, hech qanday ma'lumot ko'rsatilmaydi
+    if (filterPartNames.length === 0) {
+      return [];
+    }
+
     return parts.filter((item) => {
-      // 1. Qism nomlari mosligi (ko'p tanlovli)
-      if (filterPartNames.length > 0 && !filterPartNames.includes(item.partName || '')) {
+      // 1. Qism nomlari mosligi (ko'p tanlovli, majburiy)
+      const partName = (item.partName || '').trim();
+      if (!filterPartNames.includes(partName)) {
         return false;
       }
 
-      // 2. Brend mosligi (ko'p tanlovli)
-      if (filterBrands.length > 0 && !filterBrands.includes(item.brand || '')) {
-        return false;
+      // 2. Brend mosligi (ko'p tanlovli, ixtiyoriy)
+      if (filterBrands.length > 0) {
+        const brand = (item.brand || '').trim();
+        if (!filterBrands.includes(brand)) return false;
       }
 
-      // 3. Kod mosligi (ko'p tanlovli)
-      if (filterCodes.length > 0 && !filterCodes.includes(item.code || '')) {
-        return false;
+      // 3. Kod mosligi (ko'p tanlovli, qism nomiga bog'liq)
+      if (filterCodes.length > 0) {
+        const code = (item.code || '').trim();
+        if (!filterCodes.includes(code)) return false;
       }
 
-      // 4. Maxsus belgisi mosligi (ko'p tanlovli)
-      if (filterSpecialMarks.length > 0 && !filterSpecialMarks.includes(item.specialMark || '')) {
-        return false;
+      // 4. Maxsus belgisi mosligi (ko'p tanlovli, qism nomiga bog'liq)
+      if (filterSpecialMarks.length > 0) {
+        const specialMark = (item.specialMark || '').trim();
+        if (!filterSpecialMarks.includes(specialMark)) return false;
       }
 
-      // 5. Mashinadagi joyi mosligi (ko'p tanlovli)
-      if (filterCarPositions.length > 0 && !filterCarPositions.includes(item.carPosition || '')) {
-        return false;
+      // 5. Mashinadagi joyi mosligi (ko'p tanlovli, qism nomiga bog'liq)
+      if (filterCarPositions.length > 0) {
+        const carPosition = (item.carPosition || '').trim();
+        if (!filterCarPositions.includes(carPosition)) return false;
       }
 
-      // 6. Ishlab chiqarilgan davlati mosligi (ko'p tanlovli)
-      if (filterCountries.length > 0 && !filterCountries.includes(item.country || '')) {
-        return false;
+      // 6. Ishlab chiqarilgan davlati mosligi (ko'p tanlovli, qism nomiga bog'liq)
+      if (filterCountries.length > 0) {
+        const country = (item.country || '').trim();
+        if (!filterCountries.includes(country)) return false;
       }
 
-      // 7. Sana oralig'i mosligi
+      // 7. Yetkazib beruvchi mosligi (ko'p tanlovli, qism nomiga bog'liq)
+      if (filterSuppliers.length > 0) {
+        const supplierName = (item.supplierName || '').trim();
+        if (!filterSuppliers.includes(supplierName)) return false;
+      }
+
+      // 8. Sana oralig'i mosligi (ixtiyoriy)
       const itemDate = item.date || '';
       if (startDate && itemDate < startDate) return false;
       if (endDate && itemDate > endDate) return false;
@@ -257,6 +368,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
     filterSpecialMarks,
     filterCarPositions,
     filterCountries,
+    filterSuppliers,
     startDate,
     endDate,
   ]);
@@ -335,6 +447,17 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
       });
     }
 
+    if (filterSuppliers.length > 0) {
+      list.push({
+        id: 'suppliers',
+        label: 'Yetkazib beruvchi',
+        value: `${filterSuppliers.length} ta (${filterSuppliers.slice(0, 2).join(', ')}${
+          filterSuppliers.length > 2 ? '...' : ''
+        })`,
+        clear: () => setFilterSuppliers([]),
+      });
+    }
+
     if (startDate || endDate) {
       list.push({
         id: 'dateRange',
@@ -355,6 +478,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
     filterSpecialMarks,
     filterCarPositions,
     filterCountries,
+    filterSuppliers,
     startDate,
     endDate,
   ]);
@@ -366,6 +490,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
     setFilterSpecialMarks([]);
     setFilterCarPositions([]);
     setFilterCountries([]);
+    setFilterSuppliers([]);
     setStartDate('');
     setEndDate('');
   };
@@ -804,147 +929,225 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
 
         {/* Filtr formalar to'ri */}
         {isFilterPanelOpen && (
-          <div className="p-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-black">
-            {/* 1. Qism nomi (Ko'p tanlovli) */}
-            <MultiSelectPickFilter
-              label="1. Qism nomi"
-              options={uniquePartNames}
-              counts={partNameCounts}
-              selected={filterPartNames}
-              onChange={setFilterPartNames}
-              placeholder="Barcha qismlar"
-            />
-
-            {/* 2. Brend (Ko'p tanlovli) */}
-            <MultiSelectPickFilter
-              label="2. Brend"
-              options={uniqueBrands}
-              counts={brandCounts}
-              selected={filterBrands}
-              onChange={setFilterBrands}
-              placeholder="Barcha brendlar"
-            />
-
-            {/* 3. Kod (Ko'p tanlovli) */}
-            <MultiSelectPickFilter
-              label="3. Kod"
-              options={uniqueCodes}
-              counts={codeCounts}
-              selected={filterCodes}
-              onChange={setFilterCodes}
-              placeholder="Barcha kodlar"
-            />
-
-            {/* 4. Maxsus belgisi (Ko'p tanlovli) */}
-            <MultiSelectPickFilter
-              label="4. Maxsus belgisi"
-              options={uniqueSpecialMarks}
-              counts={specialMarkCounts}
-              selected={filterSpecialMarks}
-              onChange={setFilterSpecialMarks}
-              placeholder="Barcha belgilar"
-            />
-
-            {/* 5. Mashinadagi joyi (Ko'p tanlovli) */}
-            <MultiSelectPickFilter
-              label="5. Mashinadagi joyi"
-              options={uniqueCarPositions}
-              counts={carPositionCounts}
-              selected={filterCarPositions}
-              onChange={setFilterCarPositions}
-              placeholder="Barcha joylar"
-            />
-
-            {/* 6. Ishlab chiqarilgan davlati (Ko'p tanlovli) */}
-            <MultiSelectPickFilter
-              label="6. Davlati"
-              options={uniqueCountries}
-              counts={countryCounts}
-              selected={filterCountries}
-              onChange={setFilterCountries}
-              placeholder="Barcha davlatlar"
-            />
-
-            {/* 7. Sana oralig'i (Dan - Gacha va tezkor tugmalar) */}
-            <div className="sm:col-span-2 space-y-1.5 bg-yellow-50/70 border border-amber-300 p-2">
-              <div className="flex items-center justify-between text-[10px] font-black uppercase text-stone-800">
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3 text-amber-700" />
-                  7. Sana oralig'i
+          <div className="p-3 space-y-3 text-black">
+            {/* 1-QATOR: ASOSIY VA IXTIYORIY FILTRLAR (Qism nomi - Majburiy, Brend va Sana - Ixtiyoriy va doim ochiq) */}
+            <div className="bg-yellow-50/70 border border-amber-300 p-2.5 space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-black uppercase text-amber-950 border-b border-amber-200 pb-1">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 bg-amber-600"></span>
+                  Asosiy filtrlar (Qism nomi majburiy, Brend va Sana ixtiyoriy)
                 </span>
-                {(startDate || endDate) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStartDate('');
-                      setEndDate('');
-                    }}
-                    className="text-rose-600 hover:text-rose-800 hover:underline text-[9px] font-bold cursor-pointer"
-                    title="Sana oralig'ini tozalash"
-                  >
-                    Tozalash
-                  </button>
+                {filterPartNames.length === 0 ? (
+                  <span className="text-[10px] font-black text-rose-700 bg-rose-100 px-1.5 py-0.5 border border-rose-300 animate-pulse">
+                    ⚠️ Qism nomi tanlanishi shart
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-black text-emerald-800 bg-emerald-100 px-1.5 py-0.5 border border-emerald-300">
+                    ✓ Qism tanlandi ({filterPartNames.length} ta)
+                  </span>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <span className="text-[9px] uppercase font-bold text-stone-600 block">Dan:</span>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className={`w-full px-1.5 py-1 text-[11px] font-bold border-2 bg-white text-black focus:outline-none rounded-none ${
-                      startDate ? 'border-amber-600 bg-amber-50 font-black' : 'border-amber-400'
-                    }`}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {/* 1. Qism nomi (MAJBURIIY) */}
+                <div className="lg:col-span-1">
+                  <MultiSelectPickFilter
+                    id="filter-part-name"
+                    label="1. Qism nomi"
+                    options={uniquePartNames}
+                    counts={partNameCounts}
+                    selected={filterPartNames}
+                    onChange={setFilterPartNames}
+                    placeholder="Qism nomini tanlang"
+                    required={true}
                   />
                 </div>
-                <div>
-                  <span className="text-[9px] uppercase font-bold text-stone-600 block">Gacha:</span>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className={`w-full px-1.5 py-1 text-[11px] font-bold border-2 bg-white text-black focus:outline-none rounded-none ${
-                      endDate ? 'border-amber-600 bg-amber-50 font-black' : 'border-amber-400'
-                    }`}
+
+                {/* 2. Brend (IXTIYORIY VA OCHIQ) */}
+                <div className="lg:col-span-1">
+                  <MultiSelectPickFilter
+                    id="filter-brand"
+                    label="2. Brend"
+                    options={uniqueBrands}
+                    counts={brandCounts}
+                    selected={filterBrands}
+                    onChange={setFilterBrands}
+                    placeholder="Barcha brendlar"
                   />
+                </div>
+
+                {/* 3. Sana oralig'i (IXTIYORIY VA OCHIQ) */}
+                <div className="sm:col-span-2 space-y-1.5 bg-white border border-amber-300 p-2">
+                  <div className="flex items-center justify-between text-[10px] font-black uppercase text-stone-800">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-amber-700" />
+                      3. Sana oralig'i (Ixtiyoriy)
+                    </span>
+                    {(startDate || endDate) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStartDate('');
+                          setEndDate('');
+                        }}
+                        className="text-rose-600 hover:text-rose-800 hover:underline text-[9px] font-bold cursor-pointer"
+                        title="Sana oralig'ini tozalash"
+                      >
+                        Tozalash
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-[9px] uppercase font-bold text-stone-600 block">Dan:</span>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className={`w-full px-1.5 py-1 text-[11px] font-bold border-2 bg-white text-black focus:outline-none rounded-none ${
+                          startDate ? 'border-amber-600 bg-amber-50 font-black' : 'border-amber-400'
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[9px] uppercase font-bold text-stone-600 block">Gacha:</span>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className={`w-full px-1.5 py-1 text-[11px] font-bold border-2 bg-white text-black focus:outline-none rounded-none ${
+                          endDate ? 'border-amber-600 bg-amber-50 font-black' : 'border-amber-400'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 flex-wrap pt-1 border-t border-amber-200">
+                    <button
+                      type="button"
+                      onClick={() => handleQuickDateFilter('all')}
+                      className={`px-1.5 py-0.5 text-[10px] font-black border transition cursor-pointer ${
+                        !startDate && !endDate
+                          ? 'bg-amber-400 border-amber-600 text-black'
+                          : 'bg-white hover:bg-yellow-200 border-amber-300 text-stone-700'
+                      }`}
+                    >
+                      Barchasi
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickDateFilter('30d')}
+                      className="px-1.5 py-0.5 text-[10px] font-black bg-white hover:bg-yellow-200 border border-amber-300 text-stone-700 cursor-pointer"
+                    >
+                      30 kun
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickDateFilter('3m')}
+                      className="px-1.5 py-0.5 text-[10px] font-black bg-white hover:bg-yellow-200 border border-amber-300 text-stone-700 cursor-pointer"
+                    >
+                      3 oy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickDateFilter('year')}
+                      className="px-1.5 py-0.5 text-[10px] font-black bg-white hover:bg-yellow-200 border border-amber-300 text-stone-700 cursor-pointer"
+                    >
+                      Joriy yil
+                    </button>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              <div className="flex items-center gap-1 flex-wrap pt-1 border-t border-amber-200">
-                <button
-                  type="button"
-                  onClick={() => handleQuickDateFilter('all')}
-                  className={`px-1.5 py-0.5 text-[10px] font-black border transition cursor-pointer ${
-                    !startDate && !endDate
-                      ? 'bg-amber-400 border-amber-600 text-black'
-                      : 'bg-white hover:bg-yellow-200 border-amber-300 text-stone-700'
-                  }`}
-                >
-                  Barchasi
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickDateFilter('30d')}
-                  className="px-1.5 py-0.5 text-[10px] font-black bg-white hover:bg-yellow-200 border border-amber-300 text-stone-700 cursor-pointer"
-                >
-                  30 kun
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickDateFilter('3m')}
-                  className="px-1.5 py-0.5 text-[10px] font-black bg-white hover:bg-yellow-200 border border-amber-300 text-stone-700 cursor-pointer"
-                >
-                  3 oy
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickDateFilter('year')}
-                  className="px-1.5 py-0.5 text-[10px] font-black bg-white hover:bg-yellow-200 border border-amber-300 text-stone-700 cursor-pointer"
-                >
-                  Joriy yil
-                </button>
+            {/* 2-QATOR: QISM NOMIGA BOG'LIQ FILTRLAR (Kod, Maxsus belgi, Joy, Davlat, Yetkazib beruvchi) */}
+            <div
+              className={`p-2.5 border transition ${
+                filterPartNames.length === 0
+                  ? 'bg-stone-50 border-stone-300 opacity-80'
+                  : 'bg-yellow-50/50 border-amber-400 shadow-2xs'
+              }`}
+            >
+              <div className="flex items-center justify-between text-[11px] font-black uppercase mb-2">
+                <span className="flex items-center gap-1.5 text-stone-800">
+                  <span
+                    className={`w-2 h-2 ${filterPartNames.length === 0 ? 'bg-stone-400' : 'bg-emerald-600'}`}
+                  ></span>
+                  Tanlangan qism nomiga mos parametrlar ({uniqueCodes.length} ta kod, {uniqueSuppliers.length} ta yetkazib beruvchi)
+                </span>
+                {filterPartNames.length === 0 && (
+                  <span className="text-[10px] font-bold text-stone-500 italic">
+                    🔒 Qism nomi tanlangach ochiladi
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                {/* 4. Kod */}
+                <MultiSelectPickFilter
+                  id="filter-code"
+                  label="4. Kod"
+                  options={uniqueCodes}
+                  counts={codeCounts}
+                  selected={filterCodes}
+                  onChange={setFilterCodes}
+                  placeholder={filterPartNames.length === 0 ? "Qism tanlanmagan" : "Barcha kodlar"}
+                  disabled={filterPartNames.length === 0}
+                  disabledTooltip="Kodlarni filtrlash uchun avval '1. Qism nomi'ni tanlang"
+                />
+
+                {/* 5. Maxsus belgisi */}
+                <MultiSelectPickFilter
+                  id="filter-special-mark"
+                  label="5. Maxsus belgisi"
+                  options={uniqueSpecialMarks}
+                  counts={specialMarkCounts}
+                  selected={filterSpecialMarks}
+                  onChange={setFilterSpecialMarks}
+                  placeholder={filterPartNames.length === 0 ? "Qism tanlanmagan" : "Barcha belgilar"}
+                  disabled={filterPartNames.length === 0}
+                  disabledTooltip="Maxsus belgilarni filtrlash uchun avval '1. Qism nomi'ni tanlang"
+                />
+
+                {/* 6. Mashinadagi joyi */}
+                <MultiSelectPickFilter
+                  id="filter-car-position"
+                  label="6. Mashinadagi joyi"
+                  options={uniqueCarPositions}
+                  counts={carPositionCounts}
+                  selected={filterCarPositions}
+                  onChange={setFilterCarPositions}
+                  placeholder={filterPartNames.length === 0 ? "Qism tanlanmagan" : "Barcha joylar"}
+                  disabled={filterPartNames.length === 0}
+                  disabledTooltip="Mashinadagi joyni filtrlash uchun avval '1. Qism nomi'ni tanlang"
+                />
+
+                {/* 7. Ishlab chiqarilgan davlati */}
+                <MultiSelectPickFilter
+                  id="filter-country"
+                  label="7. Davlati"
+                  options={uniqueCountries}
+                  counts={countryCounts}
+                  selected={filterCountries}
+                  onChange={setFilterCountries}
+                  placeholder={filterPartNames.length === 0 ? "Qism tanlanmagan" : "Barcha davlatlar"}
+                  disabled={filterPartNames.length === 0}
+                  disabledTooltip="Davlati bo'yicha filtrlash uchun avval '1. Qism nomi'ni tanlang"
+                />
+
+                {/* 8. Yetkazib beruvchi */}
+                <MultiSelectPickFilter
+                  id="filter-supplier"
+                  label="8. Yetkazib beruvchi"
+                  options={uniqueSuppliers}
+                  counts={supplierCountsInFiltered}
+                  selected={filterSuppliers}
+                  onChange={setFilterSuppliers}
+                  placeholder={filterPartNames.length === 0 ? "Qism tanlanmagan" : "Barcha yetkazib beruvchilar"}
+                  disabled={filterPartNames.length === 0}
+                  disabledTooltip="Yetkazib beruvchilarni filtrlash uchun avval '1. Qism nomi'ni tanlang"
+                />
               </div>
             </div>
           </div>
@@ -1151,12 +1354,44 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ parts, suppliers =
       {/* ========================================================================= */}
       {/* 3. ASOSIY TAHLIL VA GRAFIK QISMI                                          */}
       {/* ========================================================================= */}
-      {sortedRecords.length === 0 ? (
+      {filterPartNames.length === 0 ? (
+        <div className="p-8 sm:p-12 text-center bg-yellow-50/80 border-2 border-dashed border-amber-400 text-black space-y-3">
+          <div className="w-12 h-12 bg-amber-400 border-2 border-amber-600 flex items-center justify-center mx-auto text-black shadow-xs">
+            <Filter className="w-6 h-6 stroke-[2.5]" />
+          </div>
+          <div className="space-y-1">
+            <span className="px-2 py-0.5 bg-rose-200 border border-rose-400 text-rose-950 text-xs font-black uppercase">
+              Majburiy qadam
+            </span>
+            <h3 className="font-black text-sm sm:text-base uppercase tracking-wider text-black pt-1">
+              Tahlilni boshlash uchun ehtiyot qism nomini tanlang
+            </h3>
+            <p className="text-xs sm:text-sm text-stone-700 max-w-lg mx-auto font-medium">
+              Ehtiyot qismlar narxlar dinamikasini ko'rish uchun yuqoridagi <strong>«1. Qism nomi»</strong> maydonidan bir yoki bir nechta ehtiyot qismini tanlang. Qism nomi tanlangach, unga tegishli kodlar, maxsus belgilar, joylar, davlatlar va yetkazib beruvchilar ochiladi.
+            </p>
+          </div>
+          {uniquePartNames.length > 0 && (
+            <div className="pt-2 flex items-center justify-center gap-1.5 flex-wrap max-w-2xl mx-auto">
+              <span className="text-[11px] font-bold text-stone-600 mr-1">Mavjud qismlardan tezkor tanlash:</span>
+              {uniquePartNames.slice(0, 6).map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => setFilterPartNames([name])}
+                  className="px-2 py-1 bg-amber-200 hover:bg-amber-300 border border-amber-500 text-black text-xs font-black cursor-pointer active:scale-95 transition"
+                >
+                  + {name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : sortedRecords.length === 0 ? (
         <div className="p-6 sm:p-8 text-center bg-yellow-50 border-2 border-amber-300 text-black space-y-2">
           <Info className="w-7 h-7 sm:w-8 sm:h-8 text-amber-600 mx-auto opacity-75" />
           <h3 className="font-black text-xs sm:text-sm uppercase">Tanlangan parametrlar bo'yicha ma'lumot topilmadi</h3>
           <p className="text-[11px] sm:text-xs text-stone-600 max-w-md mx-auto">
-            Belgilangan filtrlar bo'yicha yozuvlar mavjud emas. Yuqoridagi filtrlarni tozalang yoki parametrlarini kengaytiring.
+            Tanlangan qism va qo'shimcha parametrlar (kod, belgi, joy, davlat, yetkazib beruvchi, sana) bo'yicha birorta ham yozuv mos kelmadi.
           </p>
           {activeFilters.length > 0 && (
             <button

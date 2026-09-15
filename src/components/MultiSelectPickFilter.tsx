@@ -9,6 +9,9 @@ interface MultiSelectPickFilterProps {
   selected: string[];
   onChange: (selected: string[]) => void;
   placeholder?: string;
+  disabled?: boolean;
+  disabledTooltip?: string;
+  required?: boolean;
 }
 
 export const MultiSelectPickFilter: React.FC<MultiSelectPickFilterProps> = ({
@@ -19,6 +22,9 @@ export const MultiSelectPickFilter: React.FC<MultiSelectPickFilterProps> = ({
   selected,
   onChange,
   placeholder = 'Barchasi',
+  disabled = false,
+  disabledTooltip = 'Avval qism nomini tanlang',
+  required = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -39,13 +45,22 @@ export const MultiSelectPickFilter: React.FC<MultiSelectPickFilterProps> = ({
     };
   }, [isOpen]);
 
+  const formatDisplayValue = (val: string) => {
+    if (val === '') return "(Bo'sh / Kiritilmagan)";
+    return val;
+  };
+
   const filteredOptions = useMemo(() => {
     if (!search.trim()) return options;
     const q = search.toLowerCase().trim();
-    return options.filter((opt) => opt.toLowerCase().includes(q));
+    return options.filter((opt) => {
+      const display = formatDisplayValue(opt).toLowerCase();
+      return display.includes(q) || opt.toLowerCase().includes(q);
+    });
   }, [options, search]);
 
   const handleToggle = (val: string) => {
+    if (disabled) return;
     if (selected.includes(val)) {
       onChange(selected.filter((item) => item !== val));
     } else {
@@ -54,10 +69,12 @@ export const MultiSelectPickFilter: React.FC<MultiSelectPickFilterProps> = ({
   };
 
   const handleSelectAll = () => {
+    if (disabled) return;
     onChange([...options]);
   };
 
   const handleClear = () => {
+    if (disabled) return;
     onChange([]);
   };
 
@@ -66,10 +83,17 @@ export const MultiSelectPickFilter: React.FC<MultiSelectPickFilterProps> = ({
 
   return (
     <div ref={containerRef} className="relative space-y-1 text-black font-sans" id={id}>
-      {/* Label and Top Clear */}
+      {/* Label, Required badge, and Top Clear */}
       <div className="flex items-center justify-between text-[10px] font-black uppercase text-stone-800">
-        <span className="truncate mr-1">{label}</span>
-        {hasSelection && (
+        <div className="flex items-center gap-1 truncate mr-1">
+          <span className="truncate">{label}</span>
+          {required && (
+            <span className="px-1 py-0.2 bg-rose-200 border border-rose-400 text-rose-950 text-[9px] font-black shrink-0">
+              Majburiy
+            </span>
+          )}
+        </div>
+        {hasSelection && !disabled && (
           <button
             type="button"
             onClick={handleClear}
@@ -84,22 +108,37 @@ export const MultiSelectPickFilter: React.FC<MultiSelectPickFilterProps> = ({
       {/* Trigger Button */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between gap-1 px-2 py-1.5 text-xs font-bold border-2 transition rounded-none text-left cursor-pointer ${
-          hasSelection
-            ? 'bg-amber-100 border-amber-600 text-black shadow-xs font-black'
-            : 'bg-white border-amber-400 text-stone-700 hover:bg-yellow-50'
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`w-full flex items-center justify-between gap-1 px-2 py-1.5 text-xs font-bold border-2 transition rounded-none text-left ${
+          disabled
+            ? 'bg-stone-100 border-stone-300 text-stone-400 cursor-not-allowed'
+            : hasSelection
+            ? 'bg-amber-100 border-amber-600 text-black shadow-xs font-black cursor-pointer'
+            : 'bg-white border-amber-400 text-stone-700 hover:bg-yellow-50 cursor-pointer'
         }`}
-        title={hasSelection ? `${selected.length} ta tanlangan: ${selected.join(', ')}` : placeholder}
+        title={
+          disabled
+            ? disabledTooltip
+            : hasSelection
+            ? `${selected.length} ta tanlangan: ${selected.map(formatDisplayValue).join(', ')}`
+            : placeholder
+        }
       >
         <div className="truncate flex items-center gap-1 min-w-0">
-          {hasSelection ? (
-            <span className="inline-flex items-center gap-1">
-              <span className="px-1.5 py-0.2 bg-amber-400 border border-amber-600 text-black font-black text-[10px]">
+          {disabled ? (
+            <span className="text-[11px] text-stone-400 italic truncate flex items-center gap-1">
+              <span>🔒</span> {placeholder}
+            </span>
+          ) : hasSelection ? (
+            <span className="inline-flex items-center gap-1 min-w-0">
+              <span className="px-1.5 py-0.2 bg-amber-400 border border-amber-600 text-black font-black text-[10px] shrink-0">
                 {selected.length} ta
               </span>
               <span className="text-[11px] font-black truncate text-stone-900">
-                {selected.length === 1 ? selected[0] : `${selected[0]} +${selected.length - 1}`}
+                {selected.length === 1
+                  ? formatDisplayValue(selected[0])
+                  : `${formatDisplayValue(selected[0])} +${selected.length - 1}`}
               </span>
             </span>
           ) : (
@@ -109,14 +148,18 @@ export const MultiSelectPickFilter: React.FC<MultiSelectPickFilterProps> = ({
           )}
         </div>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-stone-700 shrink-0 transition-transform ${
-            isOpen ? 'rotate-180 text-amber-900' : ''
+          className={`w-3.5 h-3.5 shrink-0 transition-transform ${
+            disabled
+              ? 'text-stone-300'
+              : isOpen
+              ? 'rotate-180 text-amber-900'
+              : 'text-stone-700'
           }`}
         />
       </button>
 
       {/* Popover Dropdown */}
-      {isOpen && (
+      {isOpen && !disabled && (
         <div className="absolute top-full left-0 z-40 mt-1 w-full min-w-[240px] max-w-[320px] bg-white border-2 border-amber-500 shadow-xl p-2 space-y-2 rounded-none animate-in fade-in zoom-in-95 duration-100">
           {/* Search box inside dropdown */}
           <div className="relative">
@@ -174,9 +217,11 @@ export const MultiSelectPickFilter: React.FC<MultiSelectPickFilterProps> = ({
               filteredOptions.map((opt) => {
                 const isChecked = selected.includes(opt);
                 const count = counts[opt] || 0;
+                const displayText = formatDisplayValue(opt);
+                const isBlank = opt === '';
                 return (
                   <label
-                    key={opt}
+                    key={opt || '__blank__'}
                     className={`flex items-center gap-2 p-1.5 text-xs font-bold cursor-pointer transition select-none ${
                       isChecked
                         ? 'bg-amber-200/80 text-black font-black'
@@ -189,7 +234,9 @@ export const MultiSelectPickFilter: React.FC<MultiSelectPickFilterProps> = ({
                       onChange={() => handleToggle(opt)}
                       className="w-3.5 h-3.5 accent-amber-600 border-amber-400 rounded-none cursor-pointer shrink-0"
                     />
-                    <span className="truncate flex-1 text-[11px]">{opt}</span>
+                    <span className={`truncate flex-1 text-[11px] ${isBlank ? 'italic text-stone-500 font-semibold' : ''}`}>
+                      {displayText}
+                    </span>
                     <span className="text-[10px] font-mono text-stone-600 bg-amber-100 px-1 py-0.2 border border-amber-300 shrink-0">
                       {count}
                     </span>

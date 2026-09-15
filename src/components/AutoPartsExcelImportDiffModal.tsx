@@ -66,13 +66,20 @@ export const AutoPartsExcelImportDiffModal: React.FC<AutoPartsExcelImportDiffMod
             </div>
           ) : (
             <>
-              <div className="p-3 bg-emerald-100 border-2 border-emerald-500 text-emerald-950 font-bold flex items-center justify-between gap-2">
+              <div className="p-3 bg-emerald-100 border-2 border-emerald-500 text-emerald-950 font-bold flex flex-wrap items-center justify-between gap-2">
                 <span>
-                  ✓ Jadval strukturasi va qatorlar soni to'liq mos keldi. Quyidagi o'zgarishlar bazaga kiritiladi:
+                  ✓ Jadval muvaffaqiyatli tekshirildi. Quyidagi o'zgarishlar va yangi qatorlar bazaga kiritiladi:
                 </span>
-                <span className="px-2 py-0.5 bg-emerald-200 border border-emerald-600 font-mono font-black text-xs shrink-0">
-                  {diffs.length} ta yozuv
-                </span>
+                <div className="flex items-center gap-2">
+                  {diffs.some((d) => d.isNewRow) && (
+                    <span className="px-2 py-0.5 bg-emerald-300 border border-emerald-700 font-mono font-black text-xs text-emerald-950">
+                      +{diffs.filter((d) => d.isNewRow).length} ta yangi qator
+                    </span>
+                  )}
+                  <span className="px-2 py-0.5 bg-amber-200 border border-amber-600 font-mono font-black text-xs shrink-0">
+                    Jami: {diffs.length} ta yozuv
+                  </span>
+                </div>
               </div>
 
               {/* Diffs List */}
@@ -80,20 +87,31 @@ export const AutoPartsExcelImportDiffModal: React.FC<AutoPartsExcelImportDiffMod
                 {diffs.map((diff, index) => (
                   <div
                     key={diff.partId || index}
-                    className="p-3 bg-white border-2 border-amber-300 shadow-2xs space-y-2"
+                    className={`p-3 border-2 shadow-2xs space-y-2 ${
+                      diff.isNewRow ? 'bg-emerald-50/70 border-emerald-500' : 'bg-white border-amber-300'
+                    }`}
                   >
                     {/* Row title */}
                     <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-amber-200">
                       <div className="flex items-center gap-2">
-                        <span className="px-1.5 py-0.5 bg-amber-300 border border-amber-500 font-mono font-black text-[11px] text-black">
+                        <span className={`px-1.5 py-0.5 border font-mono font-black text-[11px] ${
+                          diff.isNewRow
+                            ? 'bg-emerald-300 border-emerald-600 text-emerald-950'
+                            : 'bg-amber-300 border-amber-500 text-black'
+                        }`}>
                           № {diff.orderNumber}
                         </span>
                         <span className="font-black text-xs text-black">
                           {diff.partName}
                         </span>
+                        {diff.isNewRow && (
+                          <span className="px-1.5 py-0.5 bg-emerald-600 text-white font-black text-[10px] uppercase">
+                            Yangi qator
+                          </span>
+                        )}
                       </div>
                       <span className="text-[10px] font-bold text-stone-600">
-                        {diff.changes.length} ta maydon o'zgardi
+                        {diff.isNewRow ? 'Avtomatik tizim ID va vaqti berilgan' : `${diff.changes.length} ta maydon o'zgardi`}
                       </span>
                     </div>
 
